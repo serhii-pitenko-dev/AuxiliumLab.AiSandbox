@@ -4,7 +4,6 @@
       "Width": 120,
       "Height": 50
     },
-
     "ColorScheme": {
       "BorderColor": "#6060F7",
       "GlobalBackGroundColor": "#EEF8FF",
@@ -16,6 +15,7 @@
       "EnemyPathColor": "#FF6666",
       "HeroVisionColor": "#B1D6E6",
       "EnemyVisionColor": "#FFCCCC"
-    }
+    },
+    "MovementTimeout": 500 //ms"
   }
 }

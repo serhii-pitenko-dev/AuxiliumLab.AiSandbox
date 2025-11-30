@@ -6,14 +6,13 @@ namespace AiSandBox.Domain.Agents.Entities;
 
 public abstract class Agent: SandboxBaseObject
 {
-    [JsonInclude]
-    public List<Cell> VisibleCells { get; protected set; } = new();
-
     // Parameterless constructor for deserialization
     protected Agent() : base()
     {
     }
 
+    [JsonInclude]
+    public List<Cell> VisibleCells { get; protected set; } = new();
     public Agent(
         ECellType cellType,
         InitialAgentCharacters characters,
@@ -42,6 +41,9 @@ public abstract class Agent: SandboxBaseObject
 
     [JsonInclude]
     public int MaxStamina { get; protected set; }
+
+    [JsonInclude]
+    public int OrderInTurnQueue { get; set; } = 0;
 
     protected void CopyBaseTo(Agent target)
     {
@@ -128,5 +130,10 @@ public abstract class Agent: SandboxBaseObject
 
         //add current/started position to path
         AddToPath(new List<Coordinates>() { Coordinates });
+    }
+
+    public void SetOrderInTurnQueue(int order)
+    {
+        OrderInTurnQueue = order;
     }
 }

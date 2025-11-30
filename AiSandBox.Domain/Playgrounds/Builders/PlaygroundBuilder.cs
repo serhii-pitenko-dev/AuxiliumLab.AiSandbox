@@ -13,6 +13,7 @@ public class PlaygroundBuilder(
     IVisibilityService visibilityService) : IPlaygroundBuilder
 {
     private StandardPlayground? _playground;
+    private int _enemyOrderCounter = 1; // Start enemy orders from 1
 
     public StandardPlayground Playground
     {
@@ -32,6 +33,7 @@ public class PlaygroundBuilder(
     public IPlaygroundBuilder SetMap(MapSquareCells tileMap)
     {
         Playground = new StandardPlayground(tileMap, visibilityService);
+        _enemyOrderCounter = 1; // Reset counter when creating new playground
 
         return this;
     }
@@ -120,6 +122,7 @@ public class PlaygroundBuilder(
             } while (!validPosition);
 
             var enemy = EnemyFactory.CreateEnemy(new Coordinates(x, y), enemyCharacters);
+            enemy.SetOrderInTurnQueue(_enemyOrderCounter++); // Assign and increment order
 
             Playground.PlaceEnemy(enemy);
         }

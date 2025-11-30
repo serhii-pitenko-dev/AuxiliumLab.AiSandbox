@@ -19,10 +19,10 @@ public class Executor : IExecutor
     private readonly IFileDataManager<PlaygroundHistoryData> _playgroundHistoryDataFileRepository;
     private readonly IAiActions _aiActions;
     private readonly SandBoxConfiguration _configuration;
-    private ESandboxStatus sandboxStatus;
-    private Guid _sandboxId;
     private readonly IMemoryDataManager<PlayGroundStatistics> _statisticsMemoryRepository;
     private readonly IFileDataManager<PlayGroundStatistics> _statisticsFileRepository;
+    private ESandboxStatus sandboxStatus;
+    private Guid _sandboxId;
 
     public int Turn { get; private set; } = 0;
     public event Action<Guid>? GameStarted;
@@ -105,7 +105,7 @@ public class Executor : IExecutor
             playground.MoveObjectOnMap(playground.Hero.Coordinates, heroPath);
 
         // Execute enemy actions with playground ID
-        foreach (var enemy in playground.Enemies)
+        foreach (var enemy in playground.Enemies.OrderBy(e => e.OrderInTurnQueue))
         {
             playground.PrepareAgentForTurnActions(enemy);
             List<Coordinates> enemyPath = _aiActions.Action(enemy, playground.Id);

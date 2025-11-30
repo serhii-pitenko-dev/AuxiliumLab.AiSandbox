@@ -18,6 +18,7 @@ public class ConsoleRunner : IConsoleRunner
     private readonly IMapQueriesHandleService _mapQueries;
     private readonly ConsoleSize _consoleSize;
     private readonly ColorScheme _consoleColorScheme;
+    private readonly int _movementTimeout;
     private Dictionary<ECellType, string> _cellData = [];
     private Guid _playgroundId;
     private PreconditionsResponse? _preconditionsResponse;
@@ -34,6 +35,7 @@ public class ConsoleRunner : IConsoleRunner
         _mapQueries = mapQueries;
         _consoleSize = consoleSettings.Value.ConsoleSize;
         _consoleColorScheme = consoleSettings.Value.ColorScheme;
+        _movementTimeout = consoleSettings.Value.MovementTimeout;
     }
 
     public void Run()
@@ -58,6 +60,7 @@ public class ConsoleRunner : IConsoleRunner
 
     private void InitializeConsole()
     {
+        Console.CursorVisible = false; // Hide the cursor
         InitializeElementsRendering();
         ResizeConsole(_consoleSize.Width, _consoleSize.Height);
         RenderBackground(_consoleColorScheme.GlobalBackGroundColor);
@@ -72,7 +75,7 @@ public class ConsoleRunner : IConsoleRunner
 
     private void OnTurnEnded(Guid playgroundId)
     {
-        RenderMap();
+        RenderMapWithSequentialMovements();
     }
 
     private void RenderInitialGameInfo()
@@ -88,48 +91,156 @@ public class ConsoleRunner : IConsoleRunner
         AnsiConsole.WriteLine();
     }
 
-    private void RenderMap()
+    private void RenderMapWithSequentialMovements()
     {
         MapLayoutResponse mapRenderData = _mapQueries.MapLayoutQuery.GetFromMemory(_playgroundId);
         
-        int width = mapRenderData.Cells.GetLength(0);   // First dimension is Width (X)
-        int height = mapRenderData.Cells.GetLength(1);  // Second dimension is Height (Y)
+        // Get all agents (hero + enemies) with their movement data
+        var agentMovements = GetAgentMovements(mapRenderData);
+        
+        if (!agentMovements.Any())
+        {
+            // No movements to show, just render final state
+            RenderMapSnapshot(mapRenderData);
+            return;
+        }
+
+        // Get max path length to know how many steps to animate
+        int maxSteps = agentMovements.Max(a => a.Path.Count);
+
+        // Animate each step
+        for (int step = 0; step < maxSteps; step++)
+        {
+            RenderMapSnapshot(mapRenderData, step);
+            Thread.Sleep(_movementTimeout);
+        }
+
+        // Show final state
+        RenderMapSnapshot(mapRenderData);
+    }
+
+    private List<AgentMovementData> GetAgentMovements(MapLayoutResponse mapRenderData)
+    {
+        var movements = new List<AgentMovementData>();
+        
+        int width = mapRenderData.Cells.GetLength(0);
+        int height = mapRenderData.Cells.GetLength(1);
+
+        // Scan the map for agents and extract their path data
+        for (int x = 0; x < width; x++)
+        {
+            for (int y = 0; y < height; y++)
+            {
+                MapCell cell = mapRenderData.Cells[x, y];
+                
+                if (cell.CellType == ECellType.Hero && cell.HeroLayer.IsPath)
+                {
+                    // Hero found - extract path from HeroLayer
+                    var path = ExtractPathFromLayer(mapRenderData, true);
+                    if (path.Any())
+                    {
+                        movements.Add(new AgentMovementData
+                        {
+                            OrderInQueue = 0, // Hero always goes first
+                            AgentType = ECellType.Hero,
+                            Path = path
+                        });
+                    }
+                }
+                else if (cell.CellType == ECellType.Enemy && cell.EnemyLayer.IsPath)
+                {
+                    // Enemy found - extract path from EnemyLayer
+                    var path = ExtractPathFromLayer(mapRenderData, false, x, y);
+                    if (path.Any())
+                    {
+                        // Enemies start from order 1
+                        int order = GetEnemyOrder(x, y, mapRenderData);
+                        movements.Add(new AgentMovementData
+                        {
+                            OrderInQueue = order,
+                            AgentType = ECellType.Enemy,
+                            Path = path
+                        });
+                    }
+                }
+            }
+        }
+
+        return movements.OrderBy(m => m.OrderInQueue).ToList();
+    }
+
+    private List<Coordinates> ExtractPathFromLayer(MapLayoutResponse mapRenderData, bool isHero, int? startX = null, int? startY = null)
+    {
+        var path = new List<Coordinates>();
+        int width = mapRenderData.Cells.GetLength(0);
+        int height = mapRenderData.Cells.GetLength(1);
+
+        for (int y = 0; y < height; y++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                MapCell cell = mapRenderData.Cells[x, y];
+                bool hasPath = isHero ? cell.HeroLayer.IsPath : cell.EnemyLayer.IsPath;
+                
+                if (hasPath)
+                {
+                    // Convert screen coordinates back to Cartesian
+                    int cartesianY = height - 1 - y;
+                    path.Add(new Coordinates(x, cartesianY));
+                }
+            }
+        }
+
+        return path;
+    }
+
+    private int GetEnemyOrder(int x, int y, MapLayoutResponse mapRenderData)
+    {
+        // This is a placeholder - you'll need to enhance MapLayoutResponse 
+        // to include OrderInTurnQueue data from agents
+        // For now, return a default order
+        return 1;
+    }
+
+    private void RenderMapSnapshot(MapLayoutResponse mapRenderData, int? currentStep = null)
+    {
+        int width = mapRenderData.Cells.GetLength(0);
+        int height = mapRenderData.Cells.GetLength(1);
 
         // Clear previous map rendering area
-        Console.SetCursorPosition(0, 6); // Position after initial info
+        Console.SetCursorPosition(0, 6);
 
-        WriteSysInfoLine($"Turn: {mapRenderData.turnNumber}");
-        
-        // Render top border: full line of █
-        AnsiConsole.MarkupLine($"[{_consoleColorScheme.BorderColor} on {_consoleColorScheme.MapBackGroundColor}]{new string('█', width + 2)}[/]");
+        WriteSysInfoLine($" Turn: {mapRenderData.turnNumber}");
 
-        // Render map rows (iterate through Y coordinates from top to bottom)
+        // Render top border: full line of █ with empty cell at the start
+        AnsiConsole.MarkupLine($"[{_consoleColorScheme.BorderColor} on {_consoleColorScheme.MapBackGroundColor}] {new string('█', width + 2)}[/]");
+
+
+        // Render map rows
         for (int y = 0; y < height; y++)
         {
             string row = string.Empty;
             
-            // Build row by iterating through X coordinates from left to right
             for (int x = 0; x < width; x++)
             {
                 MapCell cell = mapRenderData.Cells[x, y];
                 row += GetCellSymbol(cell);
             }
 
-            // Calculate the Y-coordinate for this row (cartesian: bottom = 0, top = height-1)
             int yCoordinate = (height - 1) - y;
             string leftBorder = (yCoordinate < 10) 
                 ? yCoordinate.ToString() 
                 : "█";
 
-            // Left border (number or █) + row + right border █
+            // Added empty cell before left border
             AnsiConsole.MarkupLine(
-                $"[{_consoleColorScheme.BorderColor} on {_consoleColorScheme.MapBackGroundColor}]{leftBorder}[/]" +
+                $"[{_consoleColorScheme.BorderColor} on {_consoleColorScheme.MapBackGroundColor}] {leftBorder}[/]" +
                 $"{row}" +
                 $"[{_consoleColorScheme.BorderColor} on {_consoleColorScheme.MapBackGroundColor}]█[/]");
         }
 
-        // Render bottom border: █ + X-coordinates (0-9, then █ for rest) + █
-        string bottomBorder = "█";
+        // Render bottom border with extra space
+        string bottomBorder = " █";
         for (int x = 0; x < width; x++)
         {
             bottomBorder += (x < 10) ? x.ToString() : "█";
@@ -139,6 +250,11 @@ public class ConsoleRunner : IConsoleRunner
         AnsiConsole.MarkupLine($"[{_consoleColorScheme.BorderColor} on {_consoleColorScheme.MapBackGroundColor}]{bottomBorder}[/]");
 
         RenderBottomData(mapRenderData);
+    }
+
+    private void RenderMap()
+    {
+        RenderMapSnapshot(_mapQueries.MapLayoutQuery.GetFromMemory(_playgroundId));
     }
 
     private string GetCellSymbol(MapCell cell)
@@ -261,5 +377,13 @@ public class ConsoleRunner : IConsoleRunner
         AnsiConsole.WriteLine();
         AnsiConsole.MarkupLine($"[Red on {_consoleColorScheme.GlobalBackGroundColor}]!!! TURN LIMIT REACHED !!![/]");
         RenderMap();
+    }
+
+    // Helper class to store agent movement data
+    private class AgentMovementData
+    {
+        public int OrderInQueue { get; set; }
+        public ECellType AgentType { get; set; }
+        public List<Coordinates> Path { get; set; } = new();
     }
 }

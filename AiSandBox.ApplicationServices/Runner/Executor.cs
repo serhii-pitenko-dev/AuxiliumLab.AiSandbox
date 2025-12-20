@@ -17,7 +17,7 @@ using Microsoft.Extensions.Options;
 
 namespace AiSandBox.ApplicationServices.Runner;
 
-public class Executor : IExecutor
+public abstract class Executor
 {
     private readonly IPlaygroundCommandsHandleService _playgroundCommands;
     private readonly IMemoryDataManager<StandardPlayground> _playgroundRepository;
@@ -28,13 +28,11 @@ public class Executor : IExecutor
     private readonly IFileDataManager<PlayGroundStatistics> _statisticsFileRepository;
     private readonly IMessageBroker _messageBroker;
     private ESandboxStatus sandboxStatus;
-    private Guid _sandboxId;
-    private StandardPlayground _playground;
+    protected StandardPlayground _playground;
 
     public event Action<Guid>? OnGameStarted;
     public event Action<Guid, int>? OnTurnExecuted;
     public event Action<Guid, ESandboxStatus>? OnGameFinished;
-    public event Action<Guid, GlobalEvent>? OnGlobalEventRaised;
 
     public Executor(
         IPlaygroundCommandsHandleService mapCommands,
@@ -60,13 +58,13 @@ public class Executor : IExecutor
     public void Run()
     {
         // 1. Create standard map/sandbox
-        _sandboxId = _playgroundCommands.CreatePlaygroundCommand.Handle(new CreatePlaygroundCommandParameters(
+        var sandboxId = _playgroundCommands.CreatePlaygroundCommand.Handle(new CreatePlaygroundCommandParameters(
             _configuration.MapSettings,
             _configuration.Hero,
             _configuration.Enemy
         ));
 
-        _playground = _playgroundRepository.LoadObject(_sandboxId);
+        _playground = _playgroundRepository.LoadObject(sandboxId);
 
         // Invoke game started event with sandboxId
         StartGame();
@@ -85,7 +83,7 @@ public class Executor : IExecutor
             ExecuteTurn(_playground);
 
             // Save the updated sandbox state
-            _playgroundRepository.AddOrUpdate(_sandboxId, _playground);
+            _playgroundRepository.AddOrUpdate(sandboxId, _playground);
 
             // 5. Invoke end turn event
             OnTurnEnded();
@@ -124,7 +122,7 @@ public class Executor : IExecutor
     private void OnGameLost(GameLostEvent gameLostEvent)
     {
         // Check if the event is for the current playground
-        if (gameLostEvent.PlaygroundId == _sandboxId)
+        if (gameLostEvent.PlaygroundId == _playground.Id)
         {
             sandboxStatus = ESandboxStatus.HeroLost;
             // Fix: Use null-conditional operator and direct invocation instead of EndInvoke
@@ -135,7 +133,7 @@ public class Executor : IExecutor
     private void OnGameWon(GameWonEvent gameWonEvent)
     {
         // Check if the event is for the current playground
-        if (gameWonEvent.PlaygroundId == _sandboxId)
+        if (gameWonEvent.PlaygroundId == _playground.Id)
         {
             sandboxStatus = ESandboxStatus.HeroWon;
             OnGameFinished?.Invoke(gameWonEvent.PlaygroundId, ESandboxStatus.HeroWon);
@@ -145,7 +143,7 @@ public class Executor : IExecutor
     private void OnGameEndedByMaxTurns()
     {
         // Handle max turns reached logic
-        OnGameFinished?.Invoke(_sandboxId, ESandboxStatus.TurnLimitReached);
+        OnGameFinished?.Invoke(_playground.Id, ESandboxStatus.TurnLimitReached);
     }
 
     private void Save()
@@ -188,13 +186,5 @@ public class Executor : IExecutor
 
     }
 
-    protected virtual void OnGlobalEventInvoked(GlobalEvent globalEvent)
-    {
-        if (globalEvent is AgentMoveActionEvent moveEvent && moveEvent.From != moveEvent.To)
-        {
-            _playground.MoveObjectOnMap(moveEvent.From, new List<Coordinates>() { moveEvent.To });
-        }
-
-        OnGlobalEventRaised?.Invoke(_sandboxId, globalEvent);
-    }
+    protected abstract void OnGlobalEventInvoked(GlobalEvent globalEvent);
 }

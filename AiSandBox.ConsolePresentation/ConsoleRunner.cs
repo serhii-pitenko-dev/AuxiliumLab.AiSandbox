@@ -1,16 +1,15 @@
-﻿using AiSandBox.ApplicationServices.Orchestrators;
-using AiSandBox.ApplicationServices.Queries.Map.Entities;
+﻿using AiSandBox.ApplicationServices.Queries.Map.Entities;
 using AiSandBox.ApplicationServices.Queries.Maps;
 using AiSandBox.ApplicationServices.Queries.Maps.GetAffectedCells;
 using AiSandBox.ApplicationServices.Queries.Maps.GetMapInitialPeconditions;
 using AiSandBox.ApplicationServices.Queries.Maps.GetMapLayout;
 using AiSandBox.ApplicationServices.Runner;
+using AiSandBox.ApplicationServices.Runner.Logs.Presentation;
 using AiSandBox.ConsolePresentation.Settings;
 using AiSandBox.SharedBaseTypes.GlobalEvents;
 using AiSandBox.SharedBaseTypes.GlobalEvents.Actions.Agent;
 using AiSandBox.SharedBaseTypes.ValueObjects;
 using ConsolePresentation;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using Spectre.Console;
 
@@ -18,7 +17,7 @@ namespace AiSandBox.ConsolePresentation;
 
 public class ConsoleRunner : IConsoleRunner
 {
-    private readonly IExecutor _executor;
+    private readonly IExecutorForPresentation _executor;
     private readonly IMapQueriesHandleService _mapQueries;
     private readonly ConsoleSize _consoleSize;
     private readonly ColorScheme _consoleColorScheme;
@@ -35,10 +34,9 @@ public class ConsoleRunner : IConsoleRunner
 
 
     public ConsoleRunner(
-        IExecutor executor,
+        IExecutorForPresentation executor,
         IMapQueriesHandleService mapQueries,
-        IOptions<ConsoleSettings> consoleSettings,
-        ITurnFinalizator turnFinalizator)
+        IOptions<ConsoleSettings> consoleSettings)
     {
         _executor = executor;
         _mapQueries = mapQueries;
@@ -129,14 +127,14 @@ public class ConsoleRunner : IConsoleRunner
         RenderBottomData();
     }
 
-    private void OnGlobalEventHandler(Guid playgroundId, GlobalEvent globalEvent)
+    private void OnGlobalEventHandler(Guid playgroundId, GlobalEventPresentation globalEventPresentation)
     {
-        string eventMessage = ConvertEventToString(globalEvent);
+        string eventMessage = ConvertEventToString(globalEventPresentation);
         _eventMessages.Add(eventMessage);
         RenderBottomData();
 
         // Handle cell updates based on event type
-        if (globalEvent is AgentMoveActionEvent moveEvent)
+        if (globalEventPresentation.GlobalEvent is AgentMoveActionEvent moveEvent)
         {
             HandleAgentMoveEvent(moveEvent);
         }
@@ -219,9 +217,9 @@ public class ConsoleRunner : IConsoleRunner
         RerenderCells(affectedCellsToRerender);
     }
 
-    private string ConvertEventToString(GlobalEvent globalEvent)
+    private string ConvertEventToString(GlobalEventPresentation globalEventPresentation)
     {
-        return globalEvent switch
+        string eventMessage = globalEventPresentation.GlobalEvent switch
         {
             AgentMoveActionEvent moveEvent =>
                 moveEvent.IsSuccess
@@ -235,8 +233,17 @@ public class ConsoleRunner : IConsoleRunner
                 baseActionEvent.IsSuccess
                     ? $"Agent {baseActionEvent.AgentId:N} performed action: {baseActionEvent.ActionType}"
                     : $"Agent {baseActionEvent.AgentId:N} FAILED to perform action: {baseActionEvent.ActionType}",
-            _ => $"Unknown event: {globalEvent.GetType().Name}"
+            _ => $"Unknown event: {globalEventPresentation.GlobalEvent.GetType().Name}"
         };
+
+        // Add agent details if EventData contains AgentLog
+        if (globalEventPresentation.EventData is AgentLog agentLog)
+        {
+            string runStatus = agentLog.IsRun ? "Running" : "Walking";
+            eventMessage += $"\n    → Type: {agentLog.Type}, Speed: {agentLog.Speed}, Sight: {agentLog.SightRange}, {runStatus}, Stamina: {agentLog.Stamina}/{agentLog.MaxStamina}, Turn Order: {agentLog.OrderInTurnQueue}";
+        }
+
+        return eventMessage;
     }
 
     private void RenderInitialGameInfo()

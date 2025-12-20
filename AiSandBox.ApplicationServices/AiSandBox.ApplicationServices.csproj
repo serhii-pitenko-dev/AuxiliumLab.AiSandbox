@@ -20,7 +20,6 @@
   <ItemGroup>
     <Folder Include="Commands\Statistics\" />
     <Folder Include="Dto\" />
-    <Folder Include="Runner\Events\Representation\" />
   </ItemGroup>
 
 </Project>

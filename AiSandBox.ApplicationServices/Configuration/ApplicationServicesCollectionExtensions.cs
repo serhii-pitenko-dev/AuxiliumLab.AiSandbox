@@ -1,7 +1,6 @@
 ﻿using AiSandBox.ApplicationServices.Commands.Playground;
 using AiSandBox.ApplicationServices.Commands.Playground.CreatePlayground;
 using AiSandBox.ApplicationServices.Commands.Playground.InitializePlaygroundFromFile;
-using AiSandBox.ApplicationServices.Orchestrators;
 using AiSandBox.ApplicationServices.Queries.Maps;
 using AiSandBox.ApplicationServices.Queries.Maps.GetAffectedCells;
 using AiSandBox.ApplicationServices.Queries.Maps.GetMapInitialPeconditions;
@@ -29,8 +28,8 @@ public static class ApplicationServicesCollectionExtensions
         services.AddScoped<IAffectedCells, GetAffectedCellsHandle>();
 
 
-        services.AddScoped<IExecutor, Executor>();
-        services.AddScoped<ITurnFinalizator, TurnFinalizator>();
+        services.AddScoped<IExecutorForPresentation, ExecutorForPresentation>();
+        services.AddScoped<IExecutorForSimulation, ExecutorForSimulation>();
 
         services.AddSingleton<IFileDataManager<MapLayoutResponse>, FileDataManager<MapLayoutResponse>>();
         services.AddSingleton<IFileDataManager<PlaygroundHistoryData>, FileDataManager<PlaygroundHistoryData>>();

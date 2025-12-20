@@ -86,7 +86,7 @@ public abstract class RandomActions : IAiActions
         Coordinates currentPosition = agent.Coordinates;
         if (numberOfMoves == 0)
         {
-            ApplyAgentActionEvent(new AgentMoveActionEvent(agent.Id, currentPosition, currentPosition, IsSuccess: true));
+            ApplyAgentActionEvent(new AgentMoveActionEvent(agent.Id, agent.Type, currentPosition, currentPosition, IsSuccess: true));
         }
 
         for (int i = 0; i < numberOfMoves; i++)
@@ -95,14 +95,14 @@ public abstract class RandomActions : IAiActions
 
             if (nextCoordinate.HasValue)
             {
-                ApplyAgentActionEvent(new AgentMoveActionEvent(agent.Id, currentPosition, nextCoordinate.Value, IsSuccess: true));
+                ApplyAgentActionEvent(new AgentMoveActionEvent(agent.Id, agent.Type, currentPosition, nextCoordinate.Value, IsSuccess: true));
                 path.Add(nextCoordinate.Value);
                 currentPosition = nextCoordinate.Value;
             }
             else if (!shouldStop)
             {
                 // Failed move attempt - raise event with IsSuccess = false
-                ApplyAgentActionEvent(new AgentMoveActionEvent(agent.Id, currentPosition, currentPosition, IsSuccess: false));
+                ApplyAgentActionEvent(new AgentMoveActionEvent(agent.Id, agent.Type, currentPosition, currentPosition, IsSuccess: false));
             }
 
             if (shouldStop)

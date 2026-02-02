@@ -19,6 +19,12 @@ using AiSandBox.SharedBaseTypes.AiContract.Dto;
 using AiSandBox.SharedBaseTypes.ValueObjects;
 using Microsoft.Extensions.Options;
 
+#if CONSOLE_PRESENTATION_DEBUG
+#warning CONSOLE_PRESENTATION_DEBUG is ON
+#else
+#warning CONSOLE_PRESENTATION_DEBUG is OFF
+#endif
+
 namespace AiSandBox.ApplicationServices.Runner;
 
 public abstract class Executor: IExecutor
@@ -121,6 +127,11 @@ public abstract class Executor: IExecutor
                 
                 AgentDecisionBaseResponse agentDecision = await SendAgentActionRequest(agent, _playground.Id, cancellationToken);
                 ApplyAgentAction(agentDecision);
+
+                #if CONSOLE_PRESENTATION_DEBUG
+                //just block thread for 1 second to see the actions in console presentation
+                Task.Delay(_configuration.TurnTimeout).Wait();
+                #endif
             }
             _agentsToAct.RemoveAt(0);
         }
@@ -215,17 +226,17 @@ public abstract class Executor: IExecutor
                     sandboxStatus = result.GameStatus;
                 }
 
-#if CONSOLE_PRESENTATION_DEBUG
+                #if CONSOLE_PRESENTATION_DEBUG
                 SendAgentMoveNotification(moveEvent.Id, _playground.Id, agent.Id, moveEvent.From, moveEvent.To, isSuccess, GetAgentSnapshot(agent));
-#endif
+                #endif
                 break;
 
             case AgentDecisionUseAbilityResponse abilityEvent when abilityEvent.IsSuccess:
                 // Apply ability activation/deactivation
                 agent.DoAction(abilityEvent.ActionType, abilityEvent.IsActivated);
-#if CONSOLE_PRESENTATION_DEBUG
+                #if CONSOLE_PRESENTATION_DEBUG
                 SendAgentToggleActionNotification(abilityEvent.ActionType, _playground.Id, agent.Id, abilityEvent.IsActivated, GetAgentSnapshot(agent));
-#endif
+                #endif
                 break;
         }
     }

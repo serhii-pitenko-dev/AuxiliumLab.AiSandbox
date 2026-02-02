@@ -54,8 +54,7 @@ public class RandomActions : IAiActions
                 break;
             case AgentAction.Run:
                 // Randomly decide whether to use abilities
-                if (_random.NextDouble() < 0.2) // 20% chance
-                    return UseAbilities(agent, action, correlationId);
+                return UseAbilities(agent, action, correlationId);
                 break;
             default:
                 break;
@@ -66,7 +65,7 @@ public class RandomActions : IAiActions
 
     private AgentDecisionBaseResponse UseAbilities(AgentState agentState, AgentAction ability, Guid correlationId)
     {
-        bool isActivated = false;
+        bool isActivated = agentState.IsRun;
 
         if (_random.NextDouble() < 0.1) // 10% chance to activate ability
         {
@@ -78,7 +77,7 @@ public class RandomActions : IAiActions
 
         if (_random.NextDouble() < 0.1) // 10% chance to deactivate ability
         {
-            if (ability == AgentAction.Run && !agentState.IsRun)
+            if (ability == AgentAction.Run && agentState.IsRun)
             {
                 isActivated = false;
             }

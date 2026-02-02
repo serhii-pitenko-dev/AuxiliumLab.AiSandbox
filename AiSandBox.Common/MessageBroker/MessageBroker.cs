@@ -29,9 +29,9 @@ public class MessageBroker : IMessageBroker
     public void Publish<TMessage>(TMessage message) where TMessage : notnull, Message
     {
         if (message == null) throw new ArgumentNullException(nameof(message));
-        if (message is Response)
+        if (message is Response response)
         {
-            PublishResponse((Response)(object)message);
+            PublishResponse(response);
         }
 
         var messageType = message.GetType();

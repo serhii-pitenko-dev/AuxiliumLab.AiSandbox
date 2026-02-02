@@ -27,25 +27,29 @@ public class ExecutorForPresentation : Executor, IExecutorForPresentation
 
     protected override void SendAgentMoveNotification(Guid id, Guid playgroundId, Guid agentId, Coordinates from, Coordinates to, bool isSuccess, AgentSnapshot agentSnapshot)
     {
-        _messageBroker.Publish(new OnAgentMoveActionEvent(
+        OnBaseAgentActionEvent moveEvent = new OnAgentMoveActionEvent(
             id,
             playgroundId,
             agentId,
             from,
             to,
-            isSuccess, 
-            agentSnapshot));
+            isSuccess,
+            agentSnapshot);
+
+        _messageBroker.Publish(moveEvent);
     }
 
     protected override void SendAgentToggleActionNotification(AgentAction action, Guid playgroundId, Guid agentId, bool isActivated, AgentSnapshot agentSnapshot)
     {
-        _messageBroker.Publish(new OnAgentToggleActionEvent(
+        OnBaseAgentActionEvent actionEvent = new OnAgentToggleActionEvent(
             Guid.NewGuid(),
             playgroundId,
             agentId,
             action,
             isActivated,
-            agentSnapshot));
+            agentSnapshot);
+
+        _messageBroker.Publish(actionEvent);
     }
 }
 

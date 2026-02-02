@@ -8,7 +8,6 @@
     <PublishTrimmed>false</PublishTrimmed>
     <EnableTrimAnalyzer>false</EnableTrimAnalyzer>
     <PublishAot>false</PublishAot>
-    <DefineConstants>$(DefineConstants);CONSOLE_PRESENTATION_DEBUG</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

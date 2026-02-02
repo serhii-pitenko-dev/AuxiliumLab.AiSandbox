@@ -54,17 +54,18 @@ public class ConsoleRunner : IConsoleRunner
 
         // Subscribe to message broker
         _messageBroker.Subscribe<GameStartedEvent>(OnGameStarted);
+        _messageBroker.Subscribe<OnBaseAgentActionEvent>(OnAgentActionEvent);
         _messageBroker.Subscribe<TurnExecutedEvent>(OnTurnEnded);
         _messageBroker.Subscribe<HeroLostEvent>(OnGameLost);
         _messageBroker.Subscribe<HeroWonEvent>(OnGameWon);
-        _messageBroker.Subscribe<OnBaseAgentActionEvent>(OnAgentActionEvent);
+
 
         // Cleanup
-        _messageBroker.Unsubscribe<GameStartedEvent>(OnGameStarted);
-        _messageBroker.Unsubscribe<TurnExecutedEvent>(OnTurnEnded);
-        _messageBroker.Unsubscribe<HeroLostEvent>(OnGameLost);
-        _messageBroker.Unsubscribe<HeroWonEvent>(OnGameWon);
-        _messageBroker.Unsubscribe<OnBaseAgentActionEvent>(OnAgentActionEvent);
+        //_messageBroker.Unsubscribe<GameStartedEvent>(OnGameStarted);
+        //_messageBroker.Unsubscribe<TurnExecutedEvent>(OnTurnEnded);
+        //_messageBroker.Unsubscribe<HeroLostEvent>(OnGameLost);
+        //_messageBroker.Unsubscribe<HeroWonEvent>(OnGameWon);
+        //_messageBroker.Unsubscribe<OnBaseAgentActionEvent>(OnAgentActionEvent);
 
         //Console.ReadLine();
     }

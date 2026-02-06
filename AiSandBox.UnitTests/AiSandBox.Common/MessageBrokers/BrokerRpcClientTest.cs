@@ -1,6 +1,8 @@
 ﻿using AiSandBox.Common.MessageBroker;
 using AiSandBox.Common.MessageBroker.Contracts.AiContract.Responses;
 using AiSandBox.Common.MessageBroker.Contracts.CoreServicesContract.Events;
+using AiSandBox.Common.MessageBroker.MessageTypes;
+using AiSandBox.SharedBaseTypes.MessageTypes;
 
 namespace AiSandBox.UnitTests.AiSandBox.Common.MessageBrokers;
 
@@ -20,13 +22,18 @@ public class BrokerRpcClientTest
     [TestMethod]
     public async Task BrokerRpcClient_PublishWithResponse_Success()
     {
-        _messageBroker.Subscribe<GameStartedEvent>(msg =>
+        _messageBroker.Subscribe<InitialEvent>(msg =>
         {
-            _messageBroker.Publish(new AiReadyToActionsResponse(Guid.NewGuid(), msg.PlaygroundId, msg.Id));
+            _messageBroker.Publish(new ResponseMessage(Guid.NewGuid(), msg.PlaygroundId, msg.Id));
         });
 
         var result =
-            await _brokerRpcClient.RequestAsync<GameStartedEvent, AiReadyToActionsResponse>(new GameStartedEvent(Guid.NewGuid(), Guid.NewGuid()));
+            await _brokerRpcClient.RequestAsync<InitialEvent, ResponseMessage>(new InitialEvent(Guid.NewGuid(), Guid.NewGuid()));
     }
+
+
+    private record InitialEvent(Guid Id, Guid PlaygroundId) : Event(Id);
+
+    private record ResponseMessage(Guid Id, Guid PlaygroundId, Guid CorrelationId) : Response(Id, CorrelationId);
 
 }

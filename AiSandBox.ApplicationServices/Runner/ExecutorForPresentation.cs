@@ -36,7 +36,7 @@ public class ExecutorForPresentation : Executor, IExecutorForPresentation
             isSuccess,
             agentSnapshot);
 
-        _messageBroker.Publish(moveEvent);
+        _messageBroker.Publish<OnBaseAgentActionEvent>(moveEvent);
     }
 
     protected override void SendAgentToggleActionNotification(AgentAction action, Guid playgroundId, Guid agentId, bool isActivated, AgentSnapshot agentSnapshot)
@@ -49,7 +49,7 @@ public class ExecutorForPresentation : Executor, IExecutorForPresentation
             isActivated,
             agentSnapshot);
 
-        _messageBroker.Publish(actionEvent);
+        _messageBroker.Publish<OnBaseAgentActionEvent>(actionEvent);
     }
 }
 

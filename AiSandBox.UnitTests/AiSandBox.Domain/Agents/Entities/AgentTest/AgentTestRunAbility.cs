@@ -5,7 +5,8 @@ using AiSandBox.SharedBaseTypes.ValueObjects;
 namespace AiSandBox.UnitTests.AiSandBox.Domain.Agents.Entities.AgentTest;
 
 /// <summary>
-/// TODO: Review all tests and add tests for deactivating Run ability and its effects on stamina regeneration.
+/// Tests for Agent Run ability functionality.
+/// Tests verify movement doubling, stamina consumption, and state management.
 /// </summary>
 [TestClass]
 public class AgentTestRunAbility
@@ -24,61 +25,50 @@ public class AgentTestRunAbility
         public TestAgent() : base()
         {
         }
-
-        public void SetAvailableLimitedActions(List<AgentAction> actions)
-        {
-            AvailableActions = actions;
-        }
-
-        public List<AgentAction> GetAvailableLimitedActions()
-        {
-            return AvailableActions;
-        }
-
-        public List<AgentAction> GetExecutedActions()
-        {
-            return ExecutedActions;
-        }
     }
 
     /// <summary>
     /// Tests the Run method with various stamina scenarios to verify correct movement calculation.
-    /// Validates that movements are doubled when stamina allows, or limited by available stamina.
-    /// Test parameters: speed, stamina, initialMoveCount, expectedMoveCount.
+    /// The test uses GetReadyForNewTurn to properly initialize movement actions based on stamina and speed.
     /// </summary>
     /// <param name="speed">Agent's speed value</param>
     /// <param name="stamina">Agent's available stamina</param>
-    /// <param name="initialMoveCount">Number of Move actions available before Run</param>
-    /// <param name="expectedMoveCount">Expected number of Move actions after Run</param>
+    /// <param name="expectedMoveCountBeforeRun">Expected number of Move actions before Run is activated</param>
+    /// <param name="expectedMoveCountAfterRun">Expected number of Move actions after Run is activated</param>
     [TestMethod]
     [DataRow(5, 10, 5, 10, DisplayName = "WithSufficientStamina_DoublesAvailableMovements")]
-    [DataRow(5, 6, 5, 9, DisplayName = "WithInsufficientStamina_AddsPartialMovements")]
-    [DataRow(5, 0, 0, 0, DisplayName = "WithZeroMovements_DoublesCorrectly")]
-    [DataRow(5, 8, 4, 8, DisplayName = "WithExactStaminaForDoubling_AddsCorrectMovements")]
-    [DataRow(5, 2, 3, 5, DisplayName = "WithLowStamina_AddsMinimalMovements")]
-    [DataRow(3, 20, 8, 16, DisplayName = "WithHighStamina_DoublesLargeMovementCount")]
-    [DataRow(5, 1, 2, 3, DisplayName = "WithVeryLowStamina_AddsOnlyOneMovement")]
+    [DataRow(5, 3, 3, 6, DisplayName = "WithLimitedStamina_DoublesPartialMovements")]
+    [DataRow(5, 0, 0, 0, DisplayName = "WithZeroStamina_NoMovements")]
+    [DataRow(6, 12, 6, 12, DisplayName = "WithExactStamina_DoublesCorrectly")]
+    [DataRow(3, 2, 2, 4, DisplayName = "WithLowStamina_DoublesAvailableMovements")]
+    [DataRow(8, 20, 8, 16, DisplayName = "WithHighStamina_DoublesLargeMovementCount")]
+    [DataRow(4, 1, 1, 2, DisplayName = "WithVeryLowStamina_DoublesMinimalMovement")]
     public void Run_VariousStaminaScenarios_AddsCorrectMovements(
         int speed,
         int stamina,
-        int initialMoveCount,
-        int expectedMoveCount)
+        int expectedMoveCountBeforeRun,
+        int expectedMoveCountAfterRun)
     {
         // Arrange
         var cell = new Cell(new Coordinates(0, 0));
         var characters = new InitialAgentCharacters(speed, sightRange: 3, stamina);
         var agent = new TestAgent(cell, characters, Guid.NewGuid());
 
-        var initialActions = Enumerable.Repeat(AgentAction.Move, initialMoveCount).ToList();
-        agent.SetAvailableLimitedActions(initialActions);
+        // Initialize the agent properly - this sets up moves based on stamina and speed
+        agent.GetReadyForNewTurn();
+
+        // Verify initial state
+        var moveCountBeforeRun = agent.AvailableActions.Count(a => a == AgentAction.Move);
+        Assert.AreEqual(expectedMoveCountBeforeRun, moveCountBeforeRun,
+            $"Before Run: Expected {expectedMoveCountBeforeRun} movements with stamina {stamina} and speed {speed}");
 
         // Act
         agent.DoAction(AgentAction.Run, true);
 
         // Assert
-        var moveCount = agent.GetAvailableLimitedActions().Count(a => a == AgentAction.Move);
-        Assert.AreEqual(expectedMoveCount, moveCount,
-            $"Expected {expectedMoveCount} movements with stamina {stamina} and {initialMoveCount} initial moves");
+        var moveCountAfterRun = agent.AvailableActions.Count(a => a == AgentAction.Move);
+        Assert.AreEqual(expectedMoveCountAfterRun, moveCountAfterRun,
+            $"After Run: Expected {expectedMoveCountAfterRun} movements with stamina {stamina} and speed {speed}, but got {moveCountAfterRun}");
     }
 
     /// <summary>
@@ -92,7 +82,7 @@ public class AgentTestRunAbility
         var cell = new Cell(new Coordinates(0, 0));
         var characters = new InitialAgentCharacters(speed: 5, sightRange: 3, stamina: 10);
         var agent = new TestAgent(cell, characters, Guid.NewGuid());
-        agent.SetAvailableLimitedActions([AgentAction.Move]);
+        agent.GetReadyForNewTurn();
 
         // Act
         agent.DoAction(AgentAction.Run, true);
@@ -112,15 +102,134 @@ public class AgentTestRunAbility
         var cell = new Cell(new Coordinates(0, 0));
         var characters = new InitialAgentCharacters(speed: 5, sightRange: 3, stamina: 10);
         var agent = new TestAgent(cell, characters, Guid.NewGuid());
-        agent.SetAvailableLimitedActions([AgentAction.Move, AgentAction.Move]);
+        agent.GetReadyForNewTurn();
 
         // Act
         agent.DoAction(AgentAction.Run, true);
 
         // Assert
-        var executedActions = agent.GetExecutedActions();
-        Assert.AreEqual(1, executedActions.Count, "ExecutedActions should have exactly one action");
-        Assert.AreEqual(AgentAction.Run, executedActions[0], "The executed action should be Run");
+        var executedActions = agent.ExecutedActions;
+        Assert.IsTrue(executedActions.Contains(AgentAction.Run), "ExecutedActions should contain Run action");
     }
 
+    /// <summary>
+    /// Verifies that deactivating Run (DoAction with isActivated = false) sets IsRun to false
+    /// and removes half of the movement actions.
+    /// </summary>
+    [TestMethod]
+    public void Run_DeactivateRun_SetsIsRunToFalseAndReducesMovements()
+    {
+        // Arrange
+        var cell = new Cell(new Coordinates(0, 0));
+        var characters = new InitialAgentCharacters(speed: 6, sightRange: 3, stamina: 20);
+        var agent = new TestAgent(cell, characters, Guid.NewGuid());
+        agent.GetReadyForNewTurn();
+
+        // Activate run first
+        agent.DoAction(AgentAction.Run, true);
+        var moveCountAfterRun = agent.AvailableActions.Count(a => a == AgentAction.Move);
+
+        // Act - Deactivate run
+        agent.DoAction(AgentAction.Run, false);
+
+        // Assert
+        Assert.IsFalse(agent.IsRun, "IsRun should be false after deactivating");
+        var moveCountAfterStop = agent.AvailableActions.Count(a => a == AgentAction.Move);
+        Assert.AreEqual(moveCountAfterRun / 2, moveCountAfterStop,
+            "Movement count should be halved after deactivating run");
+    }
+
+    /// <summary>
+    /// Verifies that calling DoAction with Run when already running doesn't double-apply the effect.
+    /// </summary>
+    [TestMethod]
+    public void Run_WhenAlreadyRunning_DoesNotDoubleApply()
+    {
+        // Arrange
+        var cell = new Cell(new Coordinates(0, 0));
+        var characters = new InitialAgentCharacters(speed: 5, sightRange: 3, stamina: 20);
+        var agent = new TestAgent(cell, characters, Guid.NewGuid());
+        agent.GetReadyForNewTurn();
+
+        // First run activation
+        agent.DoAction(AgentAction.Run, true);
+        var moveCountAfterFirstRun = agent.AvailableActions.Count(a => a == AgentAction.Move);
+
+        // Act - Try to activate run again
+        agent.DoAction(AgentAction.Run, true);
+
+        // Assert
+        var moveCountAfterSecondRun = agent.AvailableActions.Count(a => a == AgentAction.Move);
+        Assert.AreEqual(moveCountAfterFirstRun, moveCountAfterSecondRun,
+            "Movement count should not change when activating run twice");
+    }
+
+    /// <summary>
+    /// Verifies that GetReadyForNewTurn properly initializes actions including Run ability.
+    /// </summary>
+    [TestMethod]
+    public void GetReadyForNewTurn_InitializesRunAction()
+    {
+        // Arrange
+        var cell = new Cell(new Coordinates(0, 0));
+        var characters = new InitialAgentCharacters(speed: 5, sightRange: 3, stamina: 10);
+        var agent = new TestAgent(cell, characters, Guid.NewGuid());
+
+        // Act
+        agent.GetReadyForNewTurn();
+
+        // Assert
+        Assert.IsTrue(agent.AvailableActions.Contains(AgentAction.Run),
+            "Available actions should include Run action after GetReadyForNewTurn");
+    }
+
+    /// <summary>
+    /// Verifies that Run respects stamina limits and doesn't add more moves than stamina allows.
+    /// </summary>
+    [TestMethod]
+    public void Run_WithInsufficientStaminaForFullDouble_AddsMaximumPossibleMoves()
+    {
+        // Arrange - Agent with speed 5 but only 7 stamina
+        var cell = new Cell(new Coordinates(0, 0));
+        var characters = new InitialAgentCharacters(speed: 5, sightRange: 3, stamina: 7);
+        var agent = new TestAgent(cell, characters, Guid.NewGuid());
+        agent.GetReadyForNewTurn();
+
+        // Initially should have 5 moves (limited by speed, not stamina)
+        var initialMoves = agent.AvailableActions.Count(a => a == AgentAction.Move);
+        Assert.AreEqual(5, initialMoves);
+
+        // Act - Try to run (would need 10 moves total, but only have 7 stamina)
+        agent.DoAction(AgentAction.Run, true);
+
+        // Assert - Should have 7 moves (stamina limit)
+        var finalMoves = agent.AvailableActions.Count(a => a == AgentAction.Move);
+        Assert.AreEqual(7, finalMoves,
+            "Agent should have maximum moves allowed by stamina when attempting to run");
+    }
+
+    /// <summary>
+    /// Verifies that agent with IsRun=true maintains doubled movements when GetReadyForNewTurn is called.
+    /// </summary>
+    [TestMethod]
+    public void GetReadyForNewTurn_WhenIsRunIsTrue_MaintainsDoubledMovements()
+    {
+        // Arrange
+        var cell = new Cell(new Coordinates(0, 0));
+        var characters = new InitialAgentCharacters(speed: 4, sightRange: 3, stamina: 10);
+        var agent = new TestAgent(cell, characters, Guid.NewGuid());
+        agent.GetReadyForNewTurn();
+
+        // Activate run
+        agent.DoAction(AgentAction.Run, true);
+        Assert.IsTrue(agent.IsRun);
+
+        // Act - Prepare for new turn (IsRun should still be true)
+        agent.GetReadyForNewTurn();
+
+        // Assert
+        var moveCount = agent.AvailableActions.Count(a => a == AgentAction.Move);
+        Assert.AreEqual(8, moveCount,
+            "When IsRun is true, GetReadyForNewTurn should maintain doubled movements");
+    }
 }

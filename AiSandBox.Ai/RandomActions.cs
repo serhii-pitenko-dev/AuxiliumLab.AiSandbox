@@ -66,12 +66,14 @@ public class RandomActions : IAiActions
     private AgentDecisionBaseResponse UseAbilities(AgentState agentState, AgentAction ability, Guid correlationId)
     {
         bool isActivated = agentState.IsRun;
+        bool isSuccess = false;
 
         if (_random.NextDouble() < 0.1) // 10% chance to activate ability
         {
             if (ability == AgentAction.Run && !agentState.IsRun)
             {
                 isActivated = true;
+                isSuccess = true;
             }
         }
 
@@ -80,6 +82,7 @@ public class RandomActions : IAiActions
             if (ability == AgentAction.Run && agentState.IsRun)
             {
                 isActivated = false;
+                isSuccess = true;
             }
         }
 
@@ -89,7 +92,7 @@ public class RandomActions : IAiActions
             isActivated, 
             ability, 
             correlationId, 
-            IsSuccess: true);
+            isSuccess);
     }
 
     private AgentDecisionMoveResponse CalculatePath(AgentState agentState, Guid correlationId)

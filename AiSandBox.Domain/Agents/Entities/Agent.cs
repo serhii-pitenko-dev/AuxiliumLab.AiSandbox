@@ -1,18 +1,18 @@
 ﻿using AiSandBox.Domain.Maps;
+using AiSandBox.Domain.Validation.Agents;
 using AiSandBox.SharedBaseTypes.ValueObjects;
+using System;
 using System.Text.Json.Serialization;
 
 namespace AiSandBox.Domain.Agents.Entities;
 
 public abstract class Agent: SandboxMapBaseObject
 {
-    /// <summary>
-    /// Define what is the number of actions are available for this agent
-    /// </summary>
-    [JsonInclude]
-    public List<AgentAction> AvailableActions { get; protected set; } = new List<AgentAction>();
+    private AgentActionAddValidator _agentActionValidator = new AgentActionAddValidator();
 
-    public List<AgentAction> ExecutedActions { get; protected set; } = new List<AgentAction>();
+    public List<AgentAction> AvailableActions { get; private set; } = new();
+
+    public List<AgentAction> ExecutedActions { get; private set; } = new();
 
     // Parameterless constructor for deserialization
     protected Agent() : base()
@@ -80,6 +80,7 @@ public abstract class Agent: SandboxMapBaseObject
         switch (action)
         {
             case AgentAction.Run:
+                UpdateActionsListOnExecute(AgentAction.Run);
                 if (!isActivated)
                 {
                     StopRunning();
@@ -100,8 +101,15 @@ public abstract class Agent: SandboxMapBaseObject
     {
         ResetPath();
         ReCalculateAvailableActions();
+        RestoringCharacteristics();
         //add current/started position to path
         PathToTarget = new List<Coordinates>() { Coordinates };
+    }
+
+    private void RestoringCharacteristics()
+    {
+        int restoredStamina = Stamina + (MaxStamina / 3);
+        Stamina = restoredStamina > MaxStamina ? MaxStamina : restoredStamina;
     }
 
     public void SetOrderInTurnQueue(int order)
@@ -116,11 +124,20 @@ public abstract class Agent: SandboxMapBaseObject
     public void ReCalculateAvailableActions()
     {
         AvailableActions.Clear();
-        AvailableActions.Add(AgentAction.Run);
+        ExecutedActions.Clear();    
+
+        AddNewActions(new List<AgentAction> { AgentAction.Run });
 
         int possibleMoves = Stamina >= Speed ? Speed : Stamina;
-        possibleMoves = IsRun ? possibleMoves * 2 : possibleMoves;
-        AvailableActions.AddRange(Enumerable.Repeat(AgentAction.Move, possibleMoves));
+        AddNewActions(Enumerable.Repeat(AgentAction.Move, possibleMoves).ToList());
+        if (IsRun)
+            Run();
+    }
+
+    public void AddNewActions(List<AgentAction> action)
+    {
+        _agentActionValidator.Validate(this, AvailableActions, action);
+        AvailableActions.AddRange(action);
     }
 
     /// <summary>
@@ -131,14 +148,10 @@ public abstract class Agent: SandboxMapBaseObject
     protected void Run()
     {
         IsRun = true;
-        UpdateActions(AgentAction.Run);
         int avaliableBeforeRunMovements = AvailableActions.Where(a => a == AgentAction.Move).Count();
         int afterRunMovements = avaliableBeforeRunMovements * 2;
-        int toAddIdeal = afterRunMovements - avaliableBeforeRunMovements;
-
-        // Add moverments after run but if stamina is less than required for full run, add as much as stamina allows
-        int toAdd = Stamina >= afterRunMovements ? toAddIdeal : (afterRunMovements - Stamina);
-        AvailableActions.AddRange(Enumerable.Repeat(AgentAction.Move, toAdd));
+        int toAdd = (afterRunMovements > Stamina ? Stamina : afterRunMovements) - avaliableBeforeRunMovements;
+        AddNewActions(Enumerable.Repeat(AgentAction.Move, toAdd).ToList());
     }
 
     /// <summary>
@@ -164,10 +177,10 @@ public abstract class Agent: SandboxMapBaseObject
     {
         PathToTarget.Add(coordinates);
 
-        UpdateActions(AgentAction.Move);
+        UpdateActionsListOnExecute(AgentAction.Move);
     }
 
-    protected void UpdateActions(AgentAction action)
+    protected void UpdateActionsListOnExecute(AgentAction action)
     {
         AvailableActions.Remove(action);
         ExecutedActions.Add(action);

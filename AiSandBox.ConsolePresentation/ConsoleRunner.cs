@@ -235,7 +235,7 @@ public class ConsoleRunner : IConsoleRunner
 
 
         string runStatus = actionEvent.AgentSnapshot.IsRun ? "Running" : "Walking";
-        eventMessage += $"\n    → Type: {actionEvent.AgentSnapshot.Type}, Speed: {actionEvent.AgentSnapshot.Speed}, Sight: {actionEvent.AgentSnapshot.SightRange}, {runStatus}, Stamina: {actionEvent.AgentSnapshot.Stamina}/{actionEvent.AgentSnapshot.MaxStamina}, Turn Order: {actionEvent.AgentSnapshot.OrderInTurnQueue}";
+        eventMessage += $"\n    → Type: {actionEvent.AgentSnapshot.Type}, Speed: {actionEvent.AgentSnapshot.Speed}, Sight: {actionEvent.AgentSnapshot.SightRange}, {runStatus}, Stamina: {actionEvent.AgentSnapshot.Stamina}, Max Stamina: {actionEvent.AgentSnapshot.MaxStamina}, Turn Order: {actionEvent.AgentSnapshot.OrderInTurnQueue}";
 
 
         return eventMessage;

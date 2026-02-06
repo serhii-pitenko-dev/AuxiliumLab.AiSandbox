@@ -1,6 +1,6 @@
 ﻿using AiSandBox.Domain.Agents.Entities;
 
-namespace AiSandBox.Domain.Validation;
+namespace AiSandBox.Domain.Validation.Agents;
 
 internal static class InitialAgentCharactersValidator
 {

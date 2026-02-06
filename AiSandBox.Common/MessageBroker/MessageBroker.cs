@@ -34,7 +34,7 @@ public class MessageBroker : IMessageBroker
             PublishResponse(response);
         }
 
-        var messageType = message.GetType();
+        var messageType = typeof(TMessage);
         if (_subscribers.TryGetValue(messageType, out var handlers))
         {
             lock (handlers)

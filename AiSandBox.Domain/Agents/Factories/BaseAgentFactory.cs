@@ -1,5 +1,5 @@
 ﻿using AiSandBox.Domain.Agents.Entities;
-using AiSandBox.Domain.Validation;
+using AiSandBox.Domain.Validation.Agents;
 
 namespace AiSandBox.Domain.Agents.Factories;
 

@@ -192,7 +192,7 @@ public abstract class Executor: IExecutor
    
     protected virtual void OnTurnEnded()
     {
-        _playground.NextTurn();
+        _playground.OnEndTurnActions();
         Save();
         _messageBroker.Publish(new TurnExecutedEvent(Guid.NewGuid(), _playground.Id, _playground.Turn));
     }

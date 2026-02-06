@@ -31,7 +31,7 @@ public class StandardPlayground
         _visibilityService = visibilityService ?? throw new ArgumentNullException(nameof(visibilityService));
     }
 
-    public void NextTurn()
+    public void OnEndTurnActions()
     {
         Turn++;
     }

@@ -43,12 +43,7 @@ public class VisibilityService : IVisibilityService
             {
                 Cell targetCell = range[x, y];
 
-                // Skip the agent's own position by checking actual coordinates
-                if (targetCell.Coordinates.X == agent.Coordinates.X &&
-                    targetCell.Coordinates.Y == agent.Coordinates.Y)
-                    continue;
-
-                // Check if there's a clear line of sight to this cell
+                // Check if there's a clear line of sight to this cell (including own position)
                 if (HasLineOfSight(range, heroX, heroY, x, y))
                 {
                     // Get the actual cell from the map to persist the sight changes

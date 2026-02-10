@@ -106,8 +106,8 @@ public class AgentTestRunAbility
         agent.DoAction(AgentAction.Run, true);
 
         // Assert
-        var executedActions = agent.ExecutedActions;
-        Assert.IsTrue(executedActions.Contains(AgentAction.Run), "ExecutedActions should contain Run action");
+        Assert.Contains(AgentAction.Run, agent.ExecutedActions, "ExecutedActions should contain Run action");
+        Assert.DoesNotContain(AgentAction.Run, agent.AvailableActions, "AgentActions should not contain Run action after execution");
     }
 
     /// <summary>

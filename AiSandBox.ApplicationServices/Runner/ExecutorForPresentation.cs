@@ -1,5 +1,7 @@
 ﻿using AiSandBox.Ai.AgentActions;
 using AiSandBox.ApplicationServices.Commands.Playground;
+using AiSandBox.ApplicationServices.Runner.Logs;
+using AiSandBox.ApplicationServices.Runner.Logs.Performance;
 using AiSandBox.ApplicationServices.Saver.Persistence.Sandbox.Mappers;
 using AiSandBox.ApplicationServices.Saver.Persistence.Sandbox.States;
 using AiSandBox.Common.MessageBroker;
@@ -28,8 +30,15 @@ public class ExecutorForPresentation : Executor, IExecutorForPresentation
         IMemoryDataManager<AgentStateForAIDecision> agentStateMemoryRepository,
         IMessageBroker messageBroker,
         IBrokerRpcClient brokerRpcClient,
-        IStandardPlaygroundMapper standardPlaygroundMapper) :
-        base(mapCommands, sandboxRepository, aiActions, configuration, statisticsMemoryRepository, statisticsFileRepository, playgroundStateFileRepository, agentStateMemoryRepository, messageBroker, brokerRpcClient, standardPlaygroundMapper)
+        IStandardPlaygroundMapper standardPlaygroundMapper,
+        IFileDataManager<RawDataLog> rawDataLogFileRepository,
+        IFileDataManager<TurnExecutionPerformance> turnExecutionPerformanceFileRepository,
+        IFileDataManager<SandboxExecutionPerformance> sandboxExecutionPerformanceFileRepository) :
+        base(mapCommands, sandboxRepository, aiActions, 
+             configuration, statisticsMemoryRepository, statisticsFileRepository, 
+             playgroundStateFileRepository, agentStateMemoryRepository, messageBroker, 
+             brokerRpcClient, standardPlaygroundMapper, rawDataLogFileRepository,
+             turnExecutionPerformanceFileRepository, sandboxExecutionPerformanceFileRepository)
     {
     }
 

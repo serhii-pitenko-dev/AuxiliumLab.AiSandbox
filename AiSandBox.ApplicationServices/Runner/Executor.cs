@@ -1,6 +1,8 @@
 ﻿using AiSandBox.Ai.AgentActions;
 using AiSandBox.ApplicationServices.Commands.Playground;
 using AiSandBox.ApplicationServices.Commands.Playground.CreatePlayground;
+using AiSandBox.ApplicationServices.Runner.Logs;
+using AiSandBox.ApplicationServices.Runner.Logs.Performance;
 using AiSandBox.ApplicationServices.Saver.Persistence.Sandbox.Mappers;
 using AiSandBox.ApplicationServices.Saver.Persistence.Sandbox.States;
 using AiSandBox.Common.MessageBroker;
@@ -28,7 +30,7 @@ using Microsoft.Extensions.Options;
 
 namespace AiSandBox.ApplicationServices.Runner;
 
-public abstract class Executor: IExecutor
+public abstract class Executor : IExecutor
 {
     private readonly IPlaygroundCommandsHandleService _playgroundCommands;
     private readonly IMemoryDataManager<StandardPlayground> _playgroundRepository;
@@ -41,8 +43,13 @@ public abstract class Executor: IExecutor
     protected IAiActions _aiActions;
     protected IStandardPlaygroundMapper _standardPlaygroundMapper;
     protected IFileDataManager<StandardPlaygroundState> _playgroundStateFileRepository;
+    protected IFileDataManager<RawDataLog> _rawDataLogFileRepository;
+    protected IFileDataManager<TurnExecutionPerformance> _turnExecutionPerformanceFileRepository;
+    protected IFileDataManager<SandboxExecutionPerformance> _sandboxExecutionPerformanceFileRepository;
 
     private SandboxStatus sandboxStatus;
+    private SandboxExecutionPerformance sandboxExecutionPerformance;
+
 
     public Executor(
         IPlaygroundCommandsHandleService mapCommands,
@@ -55,7 +62,10 @@ public abstract class Executor: IExecutor
         IMemoryDataManager<AgentStateForAIDecision> agentStateMemoryRepository,
         IMessageBroker messageBroker,
         IBrokerRpcClient brokerRpcClient,
-        IStandardPlaygroundMapper standardPlaygroundMapper)
+        IStandardPlaygroundMapper standardPlaygroundMapper,
+        IFileDataManager<RawDataLog> rawDataLogFileRepository,
+        IFileDataManager<TurnExecutionPerformance> turnExecutionPerformanceFileRepository,
+        IFileDataManager<SandboxExecutionPerformance> sandboxExecutionPerformanceFileRepository)
     {
         _playgroundCommands = mapCommands;
         _playgroundRepository = sandboxRepository;
@@ -66,10 +76,21 @@ public abstract class Executor: IExecutor
         _aiActions = aiActions;
         _standardPlaygroundMapper = standardPlaygroundMapper;
         _playgroundStateFileRepository = playgroundStateFileRepository;
+        _rawDataLogFileRepository = rawDataLogFileRepository;
+        _turnExecutionPerformanceFileRepository = turnExecutionPerformanceFileRepository;
+        _sandboxExecutionPerformanceFileRepository = sandboxExecutionPerformanceFileRepository;
     }
 
     public async Task RunAsync()
     {
+
+#if PERFORMANCE_ANALYSIS
+            sandboxExecutionPerformance = new SandboxExecutionPerformance
+            {
+                Start = DateTime.UtcNow,
+            };
+#endif
+
         // Create standard map/sandbox and save it
         var sandboxId = _playgroundCommands.CreatePlaygroundCommand.Handle(new CreatePlaygroundCommandParameters(
             _configuration.MapSettings,
@@ -97,20 +118,22 @@ public abstract class Executor: IExecutor
         await SaveAsync();
 
         // Notify everyone that the simulation has started
-        var result = 
+        var result =
             await _brokerRpcClient.RequestAsync<GameStartedEvent, AiReadyToActionsResponse>(new GameStartedEvent(Guid.NewGuid(), _playground.Id));
 
         CancellationToken cancellationToken = new CancellationToken();
         try
         {
-            await StartSimulationAsync(cancellationToken);
+           await CreateRawLog($"Playground with id {_playground.Id} started.");
+
+           await StartSimulationAsync(cancellationToken);
         }
-        catch (Exception)
+        catch (Exception ex)
         {
+            await CreateRawLog($"Playground with id {_playground.Id} crashed. Exception: {ex.Message}");
             await SaveAsync();
             throw;
         }
-
     }
 
     protected async Task StartSimulationAsync(CancellationToken cancellationToken)
@@ -119,8 +142,24 @@ public abstract class Executor: IExecutor
         {
             if (_playground.Turn >= _configuration.MaxTurns)
                 _messageBroker.Publish(new HeroLostEvent(Guid.NewGuid(), _playground.Id, LostReason.MaxTurnsReached));
-            
+
+            _playground.OnStartTurnActions();
+
+#if PERFORMANCE_ANALYSIS
+            sandboxExecutionPerformance.TurnPerformances[_playground.Turn] = new TurnExecutionPerformance
+                {
+                    TurnNumber = _playground.Turn,
+                    Start = DateTime.UtcNow,
+                };
+#endif
+
             await ExecuteTurnAsync(cancellationToken);
+
+#if PERFORMANCE_ANALYSIS
+            sandboxExecutionPerformance.TurnPerformances[_playground.Turn].Finish = DateTime.UtcNow;
+             await _turnExecutionPerformanceFileRepository.SaveOrAppendAsync(_playground.Id, sandboxExecutionPerformance.TurnPerformances[_playground.Turn]);
+#endif
+
         }
     }
 
@@ -131,17 +170,33 @@ public abstract class Executor: IExecutor
         while (_agentsToAct.Count > 0 && sandboxStatus == SandboxStatus.InProgress)
         {
             var agent = _agentsToAct[0];
+
+
             _playground.PrepareAgentForTurnActions(agent);
             while (agent.AvailableActions.Count > 0 && sandboxStatus == SandboxStatus.InProgress)
             {
-                
+
+#if PERFORMANCE_ANALYSIS
+
+                sandboxExecutionPerformance.TurnPerformances[_playground.Turn]
+                    .ActionPerformances[agent.Id] = new ActionExecutionPerformance
+                    {
+                        Start = DateTime.UtcNow,
+                        ObjectType = agent.Type,
+                    };
+#endif
+
                 AgentDecisionBaseResponse agentDecision = await SendAgentActionRequestAsync(agent, _playground.Id, cancellationToken);
                 ApplyAgentAction(agentDecision);
 
-                #if CONSOLE_PRESENTATION_DEBUG
-                //just block thread for 1 second to see the actions in console presentation
-                Task.Delay(_configuration.TurnTimeout).Wait();
-                #endif
+#if PERFORMANCE_ANALYSIS
+                sandboxExecutionPerformance.TurnPerformances[_playground.Turn]
+                    .ActionPerformances[agent.Id].Finish = DateTime.UtcNow;
+                sandboxExecutionPerformance.TurnPerformances[_playground.Turn]
+                    .ActionPerformances[agent.Id].Action = agentDecision.ActionType;
+
+#endif
+
             }
             _agentsToAct.RemoveAt(0);
         }
@@ -174,22 +229,20 @@ public abstract class Executor: IExecutor
 
         _agentStateMemoryRepository.AddOrUpdate(agent.Id, agentState);
 
-   
-         return await _brokerRpcClient.RequestAsync<RequestAgentDecisionMakeCommand, AgentDecisionBaseResponse>(
-                new RequestAgentDecisionMakeCommand(Guid.NewGuid(), playgroundId, agent.Id), cancellationToken);
+
+        return await _brokerRpcClient.RequestAsync<RequestAgentDecisionMakeCommand, AgentDecisionBaseResponse>(
+               new RequestAgentDecisionMakeCommand(Guid.NewGuid(), playgroundId, agent.Id), cancellationToken);
     }
 
     private async Task SaveAsync()
     {
         var dataToSave = _standardPlaygroundMapper.ToState(_playground);
-        await _playgroundStateFileRepository.AddOrUpdateAsync(_playground.Id, dataToSave);
+        await _playgroundStateFileRepository.SaveOrAppendAsync(_playground.Id, dataToSave);
     }
 
-   
+
     protected virtual void OnTurnEnded()
     {
-        _playground.OnEndTurnActions();
-        //Save();
         _messageBroker.Publish(new TurnExecutedEvent(Guid.NewGuid(), _playground.Id, _playground.Turn));
     }
 
@@ -213,7 +266,7 @@ public abstract class Executor: IExecutor
                 {
                     isSuccess = true;
                     _playground.MoveObjectOnMap(moveEvent.From, moveEvent.To);
-                    
+
                 }
                 else
                 {
@@ -221,17 +274,17 @@ public abstract class Executor: IExecutor
                     sandboxStatus = result.GameStatus;
                 }
 
-                #if CONSOLE_PRESENTATION_DEBUG
+#if CONSOLE_PRESENTATION_DEBUG
                 SendAgentMoveNotification(moveEvent.Id, _playground.Id, agent.Id, moveEvent.From, moveEvent.To, isSuccess, GetAgentSnapshot(agent));
-                #endif
+#endif
                 break;
 
             case AgentDecisionUseAbilityResponse abilityEvent when abilityEvent.IsSuccess:
                 // Apply ability activation/deactivation
                 agent.DoAction(abilityEvent.ActionType, abilityEvent.IsActivated);
-                #if CONSOLE_PRESENTATION_DEBUG
+#if CONSOLE_PRESENTATION_DEBUG
                 SendAgentToggleActionNotification(abilityEvent.ActionType, _playground.Id, agent.Id, abilityEvent.IsActivated, GetAgentSnapshot(agent));
-                #endif
+#endif
                 break;
         }
     }
@@ -251,7 +304,7 @@ public abstract class Executor: IExecutor
         }
 
         // Check for enemy is target cell with Hero
-        if (agentType is ObjectType.Enemy  && moveTo.Object.Type == ObjectType.Hero)
+        if (agentType is ObjectType.Enemy && moveTo.Object.Type == ObjectType.Hero)
         {
             _messageBroker.Publish(new HeroLostEvent(Guid.NewGuid(), _playground.Id, LostReason.HeroCatched));
             sandboxStatus = SandboxStatus.HeroLost;
@@ -313,5 +366,11 @@ public abstract class Executor: IExecutor
             agent.Stamina,
             agent.MaxStamina,
             agent.OrderInTurnQueue);
+    }
+
+    private async Task CreateRawLog(string logMessage)
+    {
+        await _rawDataLogFileRepository.SaveOrAppendAsync(
+               Guid.NewGuid(), new RawDataLog(Guid.NewGuid(), logMessage, DateTime.UtcNow));
     }
 }

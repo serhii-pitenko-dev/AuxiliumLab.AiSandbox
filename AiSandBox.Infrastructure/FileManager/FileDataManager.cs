@@ -12,7 +12,7 @@ public class FileDataManager<T>: IFileDataManager<T>
 {
     private readonly string _baseStorageDirectory;
     private readonly JsonSerializerOptions _jsonOptions;
-
+    
     public FileDataManager(IOptions<SandBoxConfiguration> SandBoxSettings)
     {
         var fileSource = SandBoxSettings.Value.MapSettings.FileSource;
@@ -44,7 +44,7 @@ public class FileDataManager<T>: IFileDataManager<T>
         };
     }
 
-    public async Task AddOrUpdateAsync(Guid id, T obj)
+    public async Task SaveOrAppendAsync(Guid id, T obj)
     {
         if (obj == null)
             throw new ArgumentNullException(nameof(obj));
@@ -60,7 +60,7 @@ public class FileDataManager<T>: IFileDataManager<T>
         
         string jsonContent = JsonSerializer.Serialize(obj, _jsonOptions);
         
-        await File.WriteAllTextAsync(filePath, jsonContent);
+        await File.AppendAllTextAsync(filePath, jsonContent);
     }
 
     public async Task<T> LoadObjectAsync(Guid id)

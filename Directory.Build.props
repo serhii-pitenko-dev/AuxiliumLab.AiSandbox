@@ -1,5 +1,5 @@
 <Project>
   <PropertyGroup Condition="'$(Configuration)'=='Debug'">
-    <DefineConstants>$(DefineConstants);CONSOLE_PRESENTATION_DEBUG</DefineConstants>
+    <DefineConstants>$(DefineConstants);CONSOLE_PRESENTATION_DEBUG;PERFORMANCE_ANALYSIS;PERFORMANCE_DETAILED_ANALYSIS</DefineConstants>
   </PropertyGroup>
 </Project>

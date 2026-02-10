@@ -1,7 +1,6 @@
 ﻿using AiSandBox.Ai.AgentActions;
 using AiSandBox.ApplicationServices.Commands.Playground;
 using AiSandBox.ApplicationServices.Commands.Playground.CreatePlayground;
-using AiSandBox.ApplicationServices.Runner.Logs.Performance;
 using AiSandBox.ApplicationServices.Runner.LogsDto;
 using AiSandBox.ApplicationServices.Runner.LogsDto.Performance;
 using AiSandBox.ApplicationServices.Saver.Persistence.Sandbox.Mappers;
@@ -263,7 +262,7 @@ public abstract class Executor : IExecutor
             case AgentDecisionMoveResponse moveEvent when moveEvent.IsSuccess && moveEvent.From != moveEvent.To:
                 // Apply movement
                 bool isSuccess;
-                var result = CheckGameStatusAndMovingPossibility(agent.Type, _playground.GetCell(moveEvent.To));
+                var result = CheckGameStatusAndMovingPossibility(agent, _playground.GetCell(moveEvent.To));
                 if (result.MovePossibility == true && result.GameStatus == SandboxStatus.InProgress)
                 {
                     isSuccess = true;
@@ -273,6 +272,7 @@ public abstract class Executor : IExecutor
                 else
                 {
                     isSuccess = false;
+                    agent.ActionFailed(AgentAction.Move);
                     sandboxStatus = result.GameStatus;
                 }
 
@@ -297,22 +297,25 @@ public abstract class Executor : IExecutor
         }
     }
 
-    private (SandboxStatus GameStatus, bool MovePossibility) CheckGameStatusAndMovingPossibility(ObjectType agentType, Cell moveTo)
+    private (SandboxStatus GameStatus, bool MovePossibility) CheckGameStatusAndMovingPossibility(Agent agent, Cell moveTo)
     {
+        if (agent.Stamina == 0)
+            return (SandboxStatus.InProgress, false);
+
         // Check for agent if target cell is empty
-        if ((agentType is ObjectType.Enemy or ObjectType.Hero) && moveTo.Object.Type == ObjectType.Empty)
+        if ((agent.Type is ObjectType.Enemy or ObjectType.Hero) && moveTo.Object.Type == ObjectType.Empty)
         {
             return (SandboxStatus.InProgress, true);
         }
 
         // Check for agent if target cell with block
-        if ((agentType is ObjectType.Enemy or ObjectType.Hero) && moveTo.Object.Type == ObjectType.Block)
+        if ((agent.Type is ObjectType.Enemy or ObjectType.Hero) && moveTo.Object.Type == ObjectType.Block)
         {
             return (SandboxStatus.InProgress, false);
         }
 
         // Check for enemy is target cell with Hero
-        if (agentType is ObjectType.Enemy && moveTo.Object.Type == ObjectType.Hero)
+        if (agent.Type is ObjectType.Enemy && moveTo.Object.Type == ObjectType.Hero)
         {
             _messageBroker.Publish(new HeroLostEvent(Guid.NewGuid(), _playground.Id, LostReason.HeroCatched));
             sandboxStatus = SandboxStatus.HeroLost;
@@ -321,13 +324,13 @@ public abstract class Executor : IExecutor
         }
 
         // Check for Hero is target cell with Exit
-        if (agentType is ObjectType.Enemy && moveTo.Object.Type == ObjectType.Exit)
+        if (agent.Type is ObjectType.Enemy && moveTo.Object.Type == ObjectType.Exit)
         {
             return (SandboxStatus.InProgress, false);
         }
 
         // Check for Hero is target cell with Enemy
-        if (agentType == ObjectType.Hero && moveTo.Object.Type == ObjectType.Enemy)
+        if (agent.Type == ObjectType.Hero && moveTo.Object.Type == ObjectType.Enemy)
         {
             _messageBroker.Publish(new HeroLostEvent(Guid.NewGuid(), _playground.Id, LostReason.HeroCatched));
             sandboxStatus = SandboxStatus.HeroLost;
@@ -336,7 +339,7 @@ public abstract class Executor : IExecutor
         }
 
         // Check for Hero is target cell with Exit
-        if (agentType == ObjectType.Hero && moveTo.Object.Type == ObjectType.Exit)
+        if (agent.Type == ObjectType.Hero && moveTo.Object.Type == ObjectType.Exit)
         {
             _messageBroker.Publish(new HeroWonEvent(Guid.NewGuid(), _playground.Id, WinReason.ExitReached));
             sandboxStatus = SandboxStatus.HeroWon;

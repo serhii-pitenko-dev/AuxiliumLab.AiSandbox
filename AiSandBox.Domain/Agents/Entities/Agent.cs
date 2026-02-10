@@ -163,6 +163,7 @@ public abstract class Agent: SandboxMapBaseObject
     /// </summary>
     public void AgentWasMoved(Coordinates coordinates)
     {
+        Stamina--;
         PathToTarget.Add(coordinates);
 
         UpdateActionsListOnExecute(AgentAction.Move);

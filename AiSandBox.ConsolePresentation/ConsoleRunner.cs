@@ -369,8 +369,8 @@ public class ConsoleRunner : IConsoleRunner
         Console.SetCursorPosition(0, bottomDataStartRow);
         AnsiConsole.MarkupLine($"[{_consoleColorScheme.BorderColor} on {_consoleColorScheme.GlobalBackGroundColor}]Events:[/]");
 
-        // Display the last 20 events (FIFO)
-        int eventsToShow = Math.Min(_eventMessages.Count, 20);
+        // Display the last 15 events (FIFO)
+        int eventsToShow = Math.Min(_eventMessages.Count, 15);
         for (int i = _eventMessages.Count - eventsToShow; i < _eventMessages.Count; i++)
         {
             AnsiConsole.MarkupLine($"[{_consoleColorScheme.BorderColor} on {_consoleColorScheme.GlobalBackGroundColor}]  {_eventMessages[i]}[/]");

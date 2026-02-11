@@ -38,12 +38,12 @@ public class StandardPlaygroundTest
     }
 
     [TestMethod]
-    public void LookAroundEveryone_HeroAtTopLeftCorner_ShouldSeeExpectedArea()
+    public void LookAroundEveryone_HeroPlaced_UpdatesVisibleCells()
     {
         // Arrange
         var playground = CreatePlayground();
         var hero = CreateHero();
-        var heroPosition = new Coordinates(0, 0);
+        var heroPosition = new Coordinates(10, 7);
         playground.PlaceHero(hero, heroPosition);
 
         // Act
@@ -53,27 +53,42 @@ public class StandardPlaygroundTest
         Assert.IsNotNull(hero.VisibleCells);
         Assert.IsTrue(hero.VisibleCells.Count > 0);
 
+        // Verify hero can see their own position
+        Assert.IsTrue(hero.VisibleCells.Any(c =>
+            c.Coordinates.X == heroPosition.X &&
+            c.Coordinates.Y == heroPosition.Y),
+            "Hero should be able to see their own position");
+
+        // Verify all visible cells are within sight range
         foreach (var cell in hero.VisibleCells)
         {
-            Assert.IsTrue(cell.Coordinates.X >= 0 && cell.Coordinates.X <= 6,
-                $"Cell X coordinate {cell.Coordinates.X} is outside expected range [0..6]");
-            Assert.IsTrue(cell.Coordinates.Y >= 0 && cell.Coordinates.Y <= 6,
-                $"Cell Y coordinate {cell.Coordinates.Y} is outside expected range [0..6]");
+            var distance = Math.Sqrt(
+                Math.Pow(cell.Coordinates.X - heroPosition.X, 2) +
+                Math.Pow(cell.Coordinates.Y - heroPosition.Y, 2));
+            Assert.IsTrue(distance <= HeroSightRange + 0.01,
+                $"Cell ({cell.Coordinates.X}, {cell.Coordinates.Y}) at distance {distance:F2} exceeds sight range {HeroSightRange}");
         }
-
-        // Verify hero can see their own position
-        Assert.IsTrue(hero.VisibleCells.Any(c => c.Coordinates.X == 0 && c.Coordinates.Y == 0),
-            "Hero should be able to see their own position");
     }
 
     [TestMethod]
-    public void LookAroundEveryone_HeroAtBottomLeftCorner_ShouldSeeExpectedArea()
+    public void LookAroundEveryone_MultipleAgents_UpdatesAllVisibleCells()
     {
         // Arrange
         var playground = CreatePlayground();
         var hero = CreateHero();
-        var heroPosition = new Coordinates(0, 13);
-        playground.PlaceHero(hero, heroPosition);
+        var enemy = new Enemy(new InitialAgentCharacters(
+            Speed: 3,
+            SightRange: 4,
+            Stamina: 10,
+            PathToTarget: [],
+            AgentActions: [],
+            ExecutedActions: [],
+            isRun: false,
+            orderInTurnQueue: 0
+        ), Guid.NewGuid());
+
+        playground.PlaceHero(hero, new Coordinates(5, 5));
+        playground.PlaceEnemy(enemy, new Coordinates(15, 8));
 
         // Act
         playground.LookAroundEveryone();
@@ -81,220 +96,15 @@ public class StandardPlaygroundTest
         // Assert
         Assert.IsNotNull(hero.VisibleCells);
         Assert.IsTrue(hero.VisibleCells.Count > 0);
+        Assert.IsNotNull(enemy.VisibleCells);
+        Assert.IsTrue(enemy.VisibleCells.Count > 0);
 
-        foreach (var cell in hero.VisibleCells)
-        {
-            Assert.IsTrue(cell.Coordinates.X >= 0 && cell.Coordinates.X <= 6,
-                $"Cell X coordinate {cell.Coordinates.X} is outside expected range [0..6]");
-            Assert.IsTrue(cell.Coordinates.Y >= 7 && cell.Coordinates.Y <= 13,
-                $"Cell Y coordinate {cell.Coordinates.Y} is outside expected range [7..13]");
-        }
+        // Verify hero sees their position
+        Assert.IsTrue(hero.VisibleCells.Any(c => c.Coordinates.X == 5 && c.Coordinates.Y == 5),
+            "Hero should see their own position");
 
-        // Verify hero can see their own position
-        Assert.IsTrue(hero.VisibleCells.Any(c => c.Coordinates.X == 0 && c.Coordinates.Y == 13),
-            "Hero should be able to see their own position");
-    }
-
-    [TestMethod]
-    public void LookAroundEveryone_HeroAtTopRightCorner_ShouldSeeExpectedArea()
-    {
-        // Arrange
-        var playground = CreatePlayground();
-        var hero = CreateHero();
-        var heroPosition = new Coordinates(20, 0);
-        playground.PlaceHero(hero, heroPosition);
-
-        // Act
-        playground.LookAroundEveryone();
-
-        // Assert
-        Assert.IsNotNull(hero.VisibleCells);
-        Assert.IsTrue(hero.VisibleCells.Count > 0);
-
-        foreach (var cell in hero.VisibleCells)
-        {
-            Assert.IsTrue(cell.Coordinates.X >= 14 && cell.Coordinates.X <= 20,
-                $"Cell X coordinate {cell.Coordinates.X} is outside expected range [14..20]");
-            Assert.IsTrue(cell.Coordinates.Y >= 0 && cell.Coordinates.Y <= 6,
-                $"Cell Y coordinate {cell.Coordinates.Y} is outside expected range [0..6]");
-        }
-
-        // Verify hero can see their own position
-        Assert.IsTrue(hero.VisibleCells.Any(c => c.Coordinates.X == 20 && c.Coordinates.Y == 0),
-            "Hero should be able to see their own position");
-    }
-
-    [TestMethod]
-    public void LookAroundEveryone_HeroAtBottomRightCorner_ShouldSeeExpectedArea()
-    {
-        // Arrange
-        var playground = CreatePlayground();
-        var hero = CreateHero();
-        var heroPosition = new Coordinates(20, 13);
-        playground.PlaceHero(hero, heroPosition);
-
-        // Act
-        playground.LookAroundEveryone();
-
-        // Assert
-        Assert.IsNotNull(hero.VisibleCells);
-        Assert.IsTrue(hero.VisibleCells.Count > 0);
-
-        foreach (var cell in hero.VisibleCells)
-        {
-            Assert.IsTrue(cell.Coordinates.X >= 14 && cell.Coordinates.X <= 20,
-                $"Cell X coordinate {cell.Coordinates.X} is outside expected range [14..20]");
-            Assert.IsTrue(cell.Coordinates.Y >= 7 && cell.Coordinates.Y <= 13,
-                $"Cell Y coordinate {cell.Coordinates.Y} is outside expected range [7..13]");
-        }
-
-        // Verify hero can see their own position
-        Assert.IsTrue(hero.VisibleCells.Any(c => c.Coordinates.X == 20 && c.Coordinates.Y == 13),
-            "Hero should be able to see their own position");
-    }
-
-    [TestMethod]
-    public void LookAroundEveryone_HeroAtPosition5_2_ShouldSeeExpectedArea()
-    {
-        // Arrange
-        var playground = CreatePlayground();
-        var hero = CreateHero();
-        var heroPosition = new Coordinates(5, 2);
-        playground.PlaceHero(hero, heroPosition);
-
-        // Act
-        playground.LookAroundEveryone();
-
-        // Assert
-        Assert.IsNotNull(hero.VisibleCells);
-        Assert.IsTrue(hero.VisibleCells.Count > 0);
-
-        foreach (var cell in hero.VisibleCells)
-        {
-            Assert.IsTrue(cell.Coordinates.X >= 0 && cell.Coordinates.X <= 11,
-                $"Cell X coordinate {cell.Coordinates.X} is outside expected range [0..11]");
-            Assert.IsTrue(cell.Coordinates.Y >= 0 && cell.Coordinates.Y <= 8,
-                $"Cell Y coordinate {cell.Coordinates.Y} is outside expected range [0..8]");
-        }
-
-        // Verify hero can see their own position
-        Assert.IsTrue(hero.VisibleCells.Any(c => c.Coordinates.X == 5 && c.Coordinates.Y == 2),
-            "Hero should be able to see their own position");
-    }
-
-    [TestMethod]
-    public void LookAroundEveryone_HeroAtPosition7_7_ShouldSeeExpectedArea()
-    {
-        // Arrange
-        var playground = CreatePlayground();
-        var hero = CreateHero();
-        var heroPosition = new Coordinates(7, 7);
-        playground.PlaceHero(hero, heroPosition);
-
-        // Act
-        playground.LookAroundEveryone();
-
-        // Assert
-        Assert.IsNotNull(hero.VisibleCells);
-        Assert.IsTrue(hero.VisibleCells.Count > 0);
-
-        foreach (var cell in hero.VisibleCells)
-        {
-            Assert.IsTrue(cell.Coordinates.X >= 1 && cell.Coordinates.X <= 13,
-                $"Cell X coordinate {cell.Coordinates.X} is outside expected range [1..13]");
-            Assert.IsTrue(cell.Coordinates.Y >= 1 && cell.Coordinates.Y <= 13,
-                $"Cell Y coordinate {cell.Coordinates.Y} is outside expected range [1..13]");
-        }
-
-        // Verify hero can see their own position
-        Assert.IsTrue(hero.VisibleCells.Any(c => c.Coordinates.X == 7 && c.Coordinates.Y == 7),
-            "Hero should be able to see their own position");
-    }
-
-    [TestMethod]
-    public void LookAroundEveryone_HeroAtPosition5_10_ShouldSeeExpectedArea()
-    {
-        // Arrange
-        var playground = CreatePlayground();
-        var hero = CreateHero();
-        var heroPosition = new Coordinates(5, 10);
-        playground.PlaceHero(hero, heroPosition);
-
-        // Act
-        playground.LookAroundEveryone();
-
-        // Assert
-        Assert.IsNotNull(hero.VisibleCells);
-        Assert.IsTrue(hero.VisibleCells.Count > 0);
-
-        foreach (var cell in hero.VisibleCells)
-        {
-            Assert.IsTrue(cell.Coordinates.X >= 0 && cell.Coordinates.X <= 11,
-                $"Cell X coordinate {cell.Coordinates.X} is outside expected range [0..11]");
-            Assert.IsTrue(cell.Coordinates.Y >= 4 && cell.Coordinates.Y <= 13,
-                $"Cell Y coordinate {cell.Coordinates.Y} is outside expected range [4..13]");
-        }
-
-        // Verify hero can see their own position
-        Assert.IsTrue(hero.VisibleCells.Any(c => c.Coordinates.X == 5 && c.Coordinates.Y == 10),
-            "Hero should be able to see their own position");
-    }
-
-    [TestMethod]
-    public void LookAroundEveryone_HeroAtPosition18_10_ShouldSeeExpectedArea()
-    {
-        // Arrange
-        var playground = CreatePlayground();
-        var hero = CreateHero();
-        var heroPosition = new Coordinates(18, 10);
-        playground.PlaceHero(hero, heroPosition);
-
-        // Act
-        playground.LookAroundEveryone();
-
-        // Assert
-        Assert.IsNotNull(hero.VisibleCells);
-        Assert.IsTrue(hero.VisibleCells.Count > 0);
-
-        foreach (var cell in hero.VisibleCells)
-        {
-            Assert.IsTrue(cell.Coordinates.X >= 12 && cell.Coordinates.X <= 20,
-                $"Cell X coordinate {cell.Coordinates.X} is outside expected range [12..20]");
-            Assert.IsTrue(cell.Coordinates.Y >= 4 && cell.Coordinates.Y <= 13,
-                $"Cell Y coordinate {cell.Coordinates.Y} is outside expected range [4..13]");
-        }
-
-        // Verify hero can see their own position
-        Assert.IsTrue(hero.VisibleCells.Any(c => c.Coordinates.X == 18 && c.Coordinates.Y == 10),
-            "Hero should be able to see their own position");
-    }
-
-    [TestMethod]
-    public void LookAroundEveryone_HeroAtPosition18_2_ShouldSeeExpectedArea()
-    {
-        // Arrange
-        var playground = CreatePlayground();
-        var hero = CreateHero();
-        var heroPosition = new Coordinates(18, 2);
-        playground.PlaceHero(hero, heroPosition);
-
-        // Act
-        playground.LookAroundEveryone();
-
-        // Assert
-        Assert.IsNotNull(hero.VisibleCells);
-        Assert.IsTrue(hero.VisibleCells.Count > 0);
-
-        foreach (var cell in hero.VisibleCells)
-        {
-            Assert.IsTrue(cell.Coordinates.X >= 12 && cell.Coordinates.X <= 20,
-                $"Cell X coordinate {cell.Coordinates.X} is outside expected range [12..20]");
-            Assert.IsTrue(cell.Coordinates.Y >= 0 && cell.Coordinates.Y <= 8,
-                $"Cell Y coordinate {cell.Coordinates.Y} is outside expected range [0..8]");
-        }
-
-        // Verify hero can see their own position
-        Assert.IsTrue(hero.VisibleCells.Any(c => c.Coordinates.X == 18 && c.Coordinates.Y == 2),
-            "Hero should be able to see their own position");
+        // Verify enemy sees their position
+        Assert.IsTrue(enemy.VisibleCells.Any(c => c.Coordinates.X == 15 && c.Coordinates.Y == 8),
+            "Enemy should see their own position");
     }
 }

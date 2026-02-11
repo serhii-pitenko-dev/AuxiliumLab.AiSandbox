@@ -11,9 +11,9 @@ public class VisibilityService : IVisibilityService
         Cell[,] range = playground.CutMapPart(agent.Coordinates, agent.SightRange);
 
         agent.VisibleCells.Clear();
-     
-        // Find the hero's actual position in the extracted grid
-        int heroX = -1, heroY = -1;
+
+        // Find the agent's actual position in the extracted grid
+        int agentX = -1, agentY = -1;
         for (int x = 0; x < range.GetLength(0); x++)
         {
             for (int y = 0; y < range.GetLength(1); y++)
@@ -21,19 +21,19 @@ public class VisibilityService : IVisibilityService
                 if (range[x, y].Coordinates.X == agent.Coordinates.X &&
                     range[x, y].Coordinates.Y == agent.Coordinates.Y)
                 {
-                    heroX = x;
-                    heroY = y;
+                    agentX = x;
+                    agentY = y;
                     break;
                 }
             }
-            if (heroX != -1) break;
+            if (agentX != -1) break;
         }
 
-        // If hero not found in range (shouldn't happen), fall back to center
-        if (heroX == -1 || heroY == -1)
+        // If agent not found in range (shouldn't happen), fall back to center
+        if (agentX == -1 || agentY == -1)
         {
-            heroX = range.GetLength(0) / 2;
-            heroY = range.GetLength(1) / 2;
+            agentX = range.GetLength(0) / 2;
+            agentY = range.GetLength(1) / 2;
         }
 
         // Iterate through all cells in the sight range
@@ -43,8 +43,16 @@ public class VisibilityService : IVisibilityService
             {
                 Cell targetCell = range[x, y];
 
-                // Check if there's a clear line of sight to this cell (including own position)
-                if (HasLineOfSight(range, heroX, heroY, x, y))
+                // Check if cell is within circular sight range
+                int dx = targetCell.Coordinates.X - agent.Coordinates.X;
+                int dy = targetCell.Coordinates.Y - agent.Coordinates.Y;
+                double distance = Math.Sqrt(dx * dx + dy * dy);
+
+                if (distance > agent.SightRange)
+                    continue;
+
+                // Check if there's a clear line of sight to this cell
+                if (HasLineOfSight(range, agentX, agentY, x, y))
                 {
                     // Get the actual cell from the map to persist the sight changes
                     Cell originalCell = playground.GetCell(targetCell.Coordinates);
@@ -56,6 +64,10 @@ public class VisibilityService : IVisibilityService
 
     private bool HasLineOfSight(Cell[,] grid, int startX, int startY, int endX, int endY)
     {
+        // If checking the same cell, always visible
+        if (startX == endX && startY == endY)
+            return true;
+
         int dx = Math.Abs(endX - startX);
         int dy = Math.Abs(endY - startY);
         int sx = startX < endX ? 1 : -1;
@@ -67,41 +79,51 @@ public class VisibilityService : IVisibilityService
 
         while (true)
         {
-            // If we've reached the target cell, it's visible
-            if (currentX == endX && currentY == endY)
-                return true;
+            // Bresenham's line algorithm - calculate next step
+            int e2 = 2 * err;
 
-            // Check bounds before accessing the array
+            bool stepX = false;
+            bool stepY = false;
+
+            if (e2 > -dy)
+            {
+                stepX = true;
+            }
+            if (e2 < dx)
+            {
+                stepY = true;
+            }
+
+            // Move to next cell
+            if (stepX)
+            {
+                err -= dy;
+                currentX += sx;
+            }
+            if (stepY)
+            {
+                err += dx;
+                currentY += sy;
+            }
+
+            // Check bounds
             if (currentX < 0 || currentX >= grid.GetLength(0) ||
                 currentY < 0 || currentY >= grid.GetLength(1))
             {
                 return false;
             }
 
-            // Check if current cell blocks vision (but not the starting position)
-            if (!(currentX == startX && currentY == startY))
-            {
-                Cell currentCell = grid[currentX, currentY];
-                if (currentCell != null && !currentCell.Object.Transparent)
-                {
-                    // This cell blocks vision, so target is not visible
-                    return false;
-                }
-            }
+            // If we've reached the target cell, it's visible (even if it's blocking)
+            if (currentX == endX && currentY == endY)
+                return true;
 
-            // Bresenham's line algorithm
-            int e2 = 2 * err;
-            if (e2 > -dy)
+            // Check if current cell blocks further vision
+            Cell currentCell = grid[currentX, currentY];
+            if (currentCell != null && !currentCell.Object.Transparent)
             {
-                err -= dy;
-                currentX += sx;
-            }
-            if (e2 < dx)
-            {
-                err += dx;
-                currentY += sy;
+                // This cell blocks vision to anything beyond it
+                return false;
             }
         }
     }
 }
-

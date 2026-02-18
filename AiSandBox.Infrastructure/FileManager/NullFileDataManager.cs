@@ -22,9 +22,9 @@ public class NullFileDataManager<T> : IFileDataManager<T>
         return Enumerable.Empty<Guid>();
     }
 
-    public Task<T?> LoadObjectAsync(Guid id)
+    public Task<T> LoadObjectAsync(Guid id)
     {
-        return Task.FromResult(default(T));
+        return Task.FromResult(default(T)!);
     }
 }
 

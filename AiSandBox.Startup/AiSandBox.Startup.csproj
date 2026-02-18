@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -11,7 +11,10 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Content Include="appsettings.json">
+    <Content Update="training-settings.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+    <Content Update="appsettings.json">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
@@ -22,11 +25,16 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.10" />
     <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.10" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.10" />
+    <PackageReference Include="System.Management" Version="10.0.3" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\AiSandBox.Ai\AiSandBox.Ai.csproj" />
+    <ProjectReference Include="..\AiSandBox.AiTrainingOrchestrator\AiSandBox.AiTrainingOrchestrator.csproj" />
+    <ProjectReference Include="..\AiSandBox.ApplicationServices\AiSandBox.ApplicationServices.csproj" />
     <ProjectReference Include="..\AiSandBox.Common\AiSandBox.Common.csproj" />
+    <ProjectReference Include="..\AiSandBox.Domain\AiSandBox.Domain.csproj" />
+    <ProjectReference Include="..\AiSandBox.GrpcHost\AiSandBox.GrpcHost.csproj" />
     <ProjectReference Include="..\AiSandBox.Infrastructure\AiSandBox.Infrastructure.csproj" />
     <ProjectReference Include="..\AiSandBox.WebApi\AiSandBox.WebApi.csproj" />
   </ItemGroup>

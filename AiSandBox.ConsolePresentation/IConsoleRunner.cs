@@ -1,4 +1,4 @@
-﻿namespace ConsolePresentation;
+﻿namespace AiSandBox.ConsolePresentation;
 
 public interface IConsoleRunner
 {

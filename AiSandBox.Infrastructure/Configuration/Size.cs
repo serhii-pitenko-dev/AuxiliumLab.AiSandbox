@@ -1,4 +1,4 @@
-﻿namespace Infrastructure.Configuration;
+﻿namespace AiSandBox.Infrastructure.Configuration;
 
 public struct Size
 {

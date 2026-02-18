@@ -5,6 +5,8 @@ VisualStudioVersion = 17.14.36414.22
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiSandBox.WebApi", "AiSandBox.WebApi\AiSandBox.WebApi.csproj", "{8CD6742E-A5F0-4426-9582-C73D4DD70505}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiSandBox.GrpcHost", "AiSandBox.GrpcHost\AiSandBox.GrpcHost.csproj", "{9F4E8A3B-1C2D-4E5F-A6B8-7D9E0F1A2B3C}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiSandBox.ApplicationServices", "AiSandBox.ApplicationServices\AiSandBox.ApplicationServices.csproj", "{285F37C0-F631-4CA4-A49C-F453395F3B19}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiSandBox.Infrastructure", "AiSandBox.Infrastructure\AiSandBox.Infrastructure.csproj", "{ADDACF68-7685-475D-8DB7-90AE133EA9B4}"
@@ -34,6 +36,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiSandBox.UnitTests", "AiSa
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiSandBox.Common", "AiSandBox.Common\AiSandBox.Common.csproj", "{ACB14A41-9DA5-485B-8047-56024CC75830}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AiSandBox.AiTrainingOrchestrator", "AiSandBox.AiTrainingOrchestrator\AiSandBox.AiTrainingOrchestrator.csproj", "{8B3D727A-02E6-4230-823E-388DECE35719}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -44,6 +48,10 @@ Global
 		{8CD6742E-A5F0-4426-9582-C73D4DD70505}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8CD6742E-A5F0-4426-9582-C73D4DD70505}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8CD6742E-A5F0-4426-9582-C73D4DD70505}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9F4E8A3B-1C2D-4E5F-A6B8-7D9E0F1A2B3C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9F4E8A3B-1C2D-4E5F-A6B8-7D9E0F1A2B3C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9F4E8A3B-1C2D-4E5F-A6B8-7D9E0F1A2B3C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9F4E8A3B-1C2D-4E5F-A6B8-7D9E0F1A2B3C}.Release|Any CPU.Build.0 = Release|Any CPU
 		{285F37C0-F631-4CA4-A49C-F453395F3B19}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{285F37C0-F631-4CA4-A49C-F453395F3B19}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{285F37C0-F631-4CA4-A49C-F453395F3B19}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -84,6 +92,10 @@ Global
 		{ACB14A41-9DA5-485B-8047-56024CC75830}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{ACB14A41-9DA5-485B-8047-56024CC75830}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{ACB14A41-9DA5-485B-8047-56024CC75830}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8B3D727A-02E6-4230-823E-388DECE35719}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8B3D727A-02E6-4230-823E-388DECE35719}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8B3D727A-02E6-4230-823E-388DECE35719}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8B3D727A-02E6-4230-823E-388DECE35719}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,4 +1,4 @@
-﻿using AiSandBox.Ai.AgentActions;
+﻿using AiSandBox.Ai;
 using AiSandBox.ApplicationServices.Queries.Map.Entities;
 using AiSandBox.ApplicationServices.Queries.Maps;
 using AiSandBox.ApplicationServices.Queries.Maps.GetAffectedCells;
@@ -11,7 +11,6 @@ using AiSandBox.Common.MessageBroker.Contracts.GlobalMessagesContract.Events.Win
 using AiSandBox.ConsolePresentation.Settings;
 using AiSandBox.Infrastructure.FileManager;
 using AiSandBox.SharedBaseTypes.ValueObjects;
-using ConsolePresentation;
 using Microsoft.Extensions.Options;
 using Spectre.Console;
 

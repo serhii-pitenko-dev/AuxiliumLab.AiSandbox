@@ -1,7 +1,6 @@
 ﻿using AiSandBox.Common.MessageBroker;
 using AiSandBox.Common.MessageBroker.Contracts.AiContract.Responses;
 using AiSandBox.Common.MessageBroker.Contracts.CoreServicesContract.Events;
-using AiSandBox.Common.MessageBroker.MessageTypes;
 using AiSandBox.SharedBaseTypes.MessageTypes;
 
 namespace AiSandBox.UnitTests.AiSandBox.Common.MessageBrokers;

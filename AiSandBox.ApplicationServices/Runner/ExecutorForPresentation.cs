@@ -1,4 +1,4 @@
-﻿using AiSandBox.Ai.AgentActions;
+﻿using AiSandBox.Ai;
 using AiSandBox.ApplicationServices.Commands.Playground;
 using AiSandBox.ApplicationServices.Runner.LogsDto;
 using AiSandBox.ApplicationServices.Runner.LogsDto.Performance;
@@ -18,7 +18,7 @@ using Microsoft.Extensions.Options;
 
 namespace AiSandBox.ApplicationServices.Runner;
 
-public class ExecutorForPresentation : Executor, IExecutorForPresentation
+public class ExecutorForPresentation: Executor, IExecutorForPresentation
 {
     public ExecutorForPresentation(
         IPlaygroundCommandsHandleService mapCommands,

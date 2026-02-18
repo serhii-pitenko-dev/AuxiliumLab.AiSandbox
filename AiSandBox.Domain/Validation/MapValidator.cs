@@ -7,13 +7,13 @@ internal static class MapValidator
         // Validate Width
         if (width < 3 || width > 500)
         {
-            throw new ArgumentException("Width must be between 10 and 500.", nameof(width));
+            throw new ArgumentException("Width must be between 3 and 500.", nameof(width));
         }
 
         // Validate Height
         if (height < 3 || height > 500)
         {
-            throw new ArgumentException("Height must be between 10 and 500.", nameof(height));
+            throw new ArgumentException("Height must be between 3 and 500.", nameof(height));
         }
     }
 

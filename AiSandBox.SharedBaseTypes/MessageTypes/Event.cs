@@ -1,5 +1,3 @@
-﻿using AiSandBox.SharedBaseTypes.MessageTypes;
-
-namespace AiSandBox.Common.MessageBroker.MessageTypes;
+﻿namespace AiSandBox.SharedBaseTypes.MessageTypes;
 
 public record Event(Guid Id) : Message(Id);

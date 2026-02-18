@@ -1,4 +1,5 @@
-﻿using AiSandBox.ApplicationServices.Commands.Playground;
+﻿using AiSandBox.Ai;
+using AiSandBox.ApplicationServices.Commands.Playground;
 using AiSandBox.ApplicationServices.Commands.Playground.CreatePlayground;
 using AiSandBox.ApplicationServices.Queries.Maps;
 using AiSandBox.ApplicationServices.Queries.Maps.GetAffectedCells;
@@ -45,6 +46,7 @@ public static class ApplicationServicesCollectionExtensions
         services.AddSingleton<IStandardPlaygroundMapper, StandardPlaygroundMapper>();
 
         services.AddScoped<IExecutorForPresentation, ExecutorForPresentation>();
+        services.AddScoped<IStandardExecutor, StandardExecutor>();
 
         services.AddSingleton<ITestPreconditionData, TestPreconditionData>();
 

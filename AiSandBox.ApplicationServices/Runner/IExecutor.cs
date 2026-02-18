@@ -1,10 +1,11 @@
-﻿using AiSandBox.SharedBaseTypes.ValueObjects;
+﻿using AiSandBox.Ai;
+using AiSandBox.SharedBaseTypes.ValueObjects;
 
 namespace AiSandBox.ApplicationServices.Runner;
 
 public interface IExecutor
 {
-    Task TestRunWithPreconditionsAsync();
-
     Task RunAsync(Guid sandboxId = default);
+
+    Task TestRunWithPreconditionsAsync();
 }

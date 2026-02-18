@@ -1,0 +1,12 @@
+{
+  "profiles": {
+    "AiSandBox.GrpcHost": {
+      "commandName": "Project",
+      "launchBrowser": true,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      },
+      "applicationUrl": "https://localhost:57208;http://localhost:57209"
+    }
+  }
+}

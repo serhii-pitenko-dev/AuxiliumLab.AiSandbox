@@ -1,4 +1,5 @@
-﻿using AiSandBox.Common.MessageBroker;
+﻿using AiSandBox.Ai.Configuration;
+using AiSandBox.Common.MessageBroker;
 using AiSandBox.Common.MessageBroker.Contracts.AiContract.Commands;
 using AiSandBox.Common.MessageBroker.Contracts.AiContract.Responses;
 using AiSandBox.Common.MessageBroker.Contracts.CoreServicesContract.Events;
@@ -6,18 +7,29 @@ using AiSandBox.Infrastructure.MemoryManager;
 using AiSandBox.SharedBaseTypes.AiContract.Dto;
 using AiSandBox.SharedBaseTypes.ValueObjects;
 
-namespace AiSandBox.Ai.AgentActions;
+namespace AiSandBox.Ai;
 
 /// <summary>
 /// Should be one instace per one simulation 
 /// </summary>
 public class RandomActions : IAiActions
 {
+    public ModelType ModelType { get; init; } = ModelType.Random;
+    public string Version { get; init; } = "1.0";
+    public AiConfiguration AiConfiguration { get; init; } = new AiConfiguration
+    {
+        ModelType = ModelType.Random,
+        Version = "1.0",
+        PolicyType = AiPolicy.MLP
+    };
+
     private readonly Random _random = new();
     private readonly IMessageBroker _messageBroker;
-    protected IMemoryDataManager<AgentStateForAIDecision> _agentStateMemoryRepository;
+    private readonly IMemoryDataManager<AgentStateForAIDecision> _agentStateMemoryRepository;
 
-    public RandomActions(IMessageBroker messageBroker, IMemoryDataManager<AgentStateForAIDecision> agentStateMemoryRepository)
+    public RandomActions(
+        IMessageBroker messageBroker, 
+        IMemoryDataManager<AgentStateForAIDecision> agentStateMemoryRepository)
     {
         _messageBroker = messageBroker;
         _agentStateMemoryRepository = agentStateMemoryRepository;

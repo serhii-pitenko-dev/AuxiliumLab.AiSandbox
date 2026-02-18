@@ -1,6 +1,6 @@
 ﻿using AiSandBox.Infrastructure.Configuration.Preconditions;
 
-namespace Infrastructure.Configuration;
+namespace AiSandBox.Infrastructure.Configuration;
 
 public class ConfigurationData
 {

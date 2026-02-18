@@ -1,5 +1,5 @@
-﻿using AiSandBox.ConsolePresentation.Settings;
-using ConsolePresentation;
+﻿using AiSandBox.ConsolePresentation;
+using AiSandBox.ConsolePresentation.Settings;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 

@@ -1,4 +1,4 @@
-﻿using AiSandBox.Ai.AgentActions;
+﻿using AiSandBox.Ai;
 using AiSandBox.ApplicationServices.Commands.Playground;
 using AiSandBox.ApplicationServices.Commands.Playground.CreatePlayground;
 using AiSandBox.ApplicationServices.Runner.LogsDto;
@@ -31,7 +31,7 @@ using Microsoft.Extensions.Options;
 
 namespace AiSandBox.ApplicationServices.Runner;
 
-public abstract class Executor : IExecutor
+public abstract class Executor: IExecutor
 {
     private readonly IPlaygroundCommandsHandleService _playgroundCommands;
     private readonly IMemoryDataManager<StandardPlayground> _playgroundRepository;

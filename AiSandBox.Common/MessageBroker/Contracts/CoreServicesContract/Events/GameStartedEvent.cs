@@ -1,4 +1,4 @@
-﻿using AiSandBox.Common.MessageBroker.MessageTypes;
+﻿using AiSandBox.SharedBaseTypes.MessageTypes;
 
 namespace AiSandBox.Common.MessageBroker.Contracts.CoreServicesContract.Events;
 

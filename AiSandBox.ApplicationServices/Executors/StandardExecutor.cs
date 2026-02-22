@@ -1,4 +1,4 @@
-﻿using AiSandBox.Ai;
+using AiSandBox.Ai;
 using AiSandBox.ApplicationServices.Commands.Playground;
 using AiSandBox.ApplicationServices.Runner.LogsDto;
 using AiSandBox.ApplicationServices.Runner.LogsDto.Performance;
@@ -6,7 +6,8 @@ using AiSandBox.ApplicationServices.Runner.TestPreconditionSet;
 using AiSandBox.ApplicationServices.Saver.Persistence.Sandbox.Mappers;
 using AiSandBox.ApplicationServices.Saver.Persistence.Sandbox.States;
 using AiSandBox.Common.MessageBroker;
-using AiSandBox.Common.MessageBroker.Contracts.CoreServicesContract.Events;
+using AiSandBox.Common.MessageBroker.Contracts.GlobalMessagesContract.Events.Lost;
+using AiSandBox.Common.MessageBroker.Contracts.GlobalMessagesContract.Events.Win;
 using AiSandBox.Domain.Playgrounds;
 using AiSandBox.Domain.Statistics.Entities;
 using AiSandBox.Domain.Statistics.Result;
@@ -17,9 +18,9 @@ using AiSandBox.SharedBaseTypes.AiContract.Dto;
 using AiSandBox.SharedBaseTypes.ValueObjects;
 using Microsoft.Extensions.Options;
 
-namespace AiSandBox.ApplicationServices.Runner;
+namespace AiSandBox.ApplicationServices.Executors;
 
-public class StandardExecutor : Executor, IStandardExecutor, IExecutorForPresentation
+public class StandardExecutor : Executor, IStandardExecutor
 {
     public StandardExecutor(
         IPlaygroundCommandsHandleService mapCommands,
@@ -47,25 +48,36 @@ public class StandardExecutor : Executor, IStandardExecutor, IExecutorForPresent
     }
 
     /// <inheritdoc/>
-    public async Task<SandboxRunResult> RunAndCaptureAsync()
+    public Task<ParticularRun> RunAndCaptureAsync() => RunAndCaptureAsync(default);
+
+    /// <inheritdoc/>
+    public async Task<ParticularRun> RunAndCaptureAsync(SandBoxConfiguration sandBoxConfiguration)
     {
-        var (winReason, lostReason) = await RunAndCaptureOutcomeAsync();
+        WinReason? winReason = null;
+        LostReason? lostReason = null;
 
-        var mapInfo = new GeneralBatchRunInformation(
-            _playground.Blocks.Count,
-            _playground.Enemies.Count,
-            _playground.MapWidth,
-            _playground.MapHeight,
-            _playground.MapArea);
+        void OnWon(HeroWonEvent e) { winReason = e.WinReason; }
+        void OnLost(HeroLostEvent e) { lostReason = e.LostReason; }
 
-        var run = new ParticularRun(
+        _messageBroker.Subscribe<HeroWonEvent>(OnWon);
+        _messageBroker.Subscribe<HeroLostEvent>(OnLost);
+
+        try
+        {
+            await RunAsync(default, sandBoxConfiguration);
+        }
+        finally
+        {
+            _messageBroker.Unsubscribe<HeroWonEvent>(OnWon);
+            _messageBroker.Unsubscribe<HeroLostEvent>(OnLost);
+        }
+
+        return new ParticularRun(
             _playground.Id,
             _playground.Turn,
             _playground.Enemies.Count,
             winReason,
             lostReason);
-
-        return new SandboxRunResult(mapInfo, run);
     }
 
     protected override void SendAgentMoveNotification(Guid id, Guid playgroundId, Guid agentId, Coordinates from, Coordinates to, bool isSuccess, AgentSnapshot agentSnapshot)
@@ -76,4 +88,3 @@ public class StandardExecutor : Executor, IStandardExecutor, IExecutorForPresent
     {
     }
 }
-

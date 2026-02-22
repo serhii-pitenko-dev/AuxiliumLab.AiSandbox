@@ -7,6 +7,7 @@ namespace AiSandBox.Domain.Statistics.Result;
 public record GeneralBatchRunInformation(
     int BlocksCount,
     int EnemiesCount,
+    int Area,
     int MapWidth,
     int MapHeight,
     int MapArea);

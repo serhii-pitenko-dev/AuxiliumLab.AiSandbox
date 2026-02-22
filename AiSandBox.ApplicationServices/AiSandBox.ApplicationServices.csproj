@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AiSandBox.Ai\AiSandBox.Ai.csproj" />
+    <ProjectReference Include="..\AiSandBox.AiTrainingOrchestrator\AiSandBox.AiTrainingOrchestrator.csproj" />
     <ProjectReference Include="..\AiSandBox.Common\AiSandBox.Common.csproj" />
     <ProjectReference Include="..\AiSandBox.Domain\AiSandBox.Domain.csproj" />
     <ProjectReference Include="..\AiSandBox.Infrastructure\AiSandBox.Infrastructure.csproj" />
@@ -19,6 +20,9 @@
 
   <ItemGroup>
     <Folder Include="Commands\Statistics\" />
+    <Folder Include="Trainer\" />
+    <Folder Include="Runner\MassRunner\" />
+    <Folder Include="Runner\SingleRunner\" />
   </ItemGroup>
 
 </Project>

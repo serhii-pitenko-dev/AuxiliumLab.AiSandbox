@@ -1,4 +1,4 @@
-﻿using AiSandBox.Ai;
+using AiSandBox.Ai;
 using AiSandBox.ApplicationServices.Commands.Playground;
 using AiSandBox.ApplicationServices.Runner.LogsDto;
 using AiSandBox.ApplicationServices.Runner.LogsDto.Performance;
@@ -9,7 +9,6 @@ using AiSandBox.Common.MessageBroker;
 using AiSandBox.Common.MessageBroker.Contracts.CoreServicesContract.Events;
 using AiSandBox.Domain.Playgrounds;
 using AiSandBox.Domain.Statistics.Entities;
-using AiSandBox.Domain.Statistics.Result;
 using AiSandBox.Infrastructure.Configuration.Preconditions;
 using AiSandBox.Infrastructure.FileManager;
 using AiSandBox.Infrastructure.MemoryManager;
@@ -17,7 +16,7 @@ using AiSandBox.SharedBaseTypes.AiContract.Dto;
 using AiSandBox.SharedBaseTypes.ValueObjects;
 using Microsoft.Extensions.Options;
 
-namespace AiSandBox.ApplicationServices.Runner;
+namespace AiSandBox.ApplicationServices.Executors;
 
 public class ExecutorForPresentation : Executor, IExecutorForPresentation
 {
@@ -44,28 +43,6 @@ public class ExecutorForPresentation : Executor, IExecutorForPresentation
              turnExecutionPerformanceFileRepository, sandboxExecutionPerformanceFileRepository,
              testPreconditionData)
     {
-    }
-
-    /// <inheritdoc/>
-    public async Task<SandboxRunResult> RunAndCaptureAsync()
-    {
-        var (winReason, lostReason) = await RunAndCaptureOutcomeAsync();
-
-        var mapInfo = new GeneralBatchRunInformation(
-            _playground.Blocks.Count,
-            _playground.Enemies.Count,
-            _playground.MapWidth,
-            _playground.MapHeight,
-            _playground.MapArea);
-
-        var run = new ParticularRun(
-            _playground.Id,
-            _playground.Turn,
-            _playground.Enemies.Count,
-            winReason,
-            lostReason);
-
-        return new SandboxRunResult(mapInfo, run);
     }
 
     protected override void SendAgentMoveNotification(Guid id, Guid playgroundId, Guid agentId, Coordinates from, Coordinates to, bool isSuccess, AgentSnapshot agentSnapshot)

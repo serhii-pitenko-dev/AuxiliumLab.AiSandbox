@@ -2,7 +2,7 @@ namespace AiSandBox.Infrastructure.Configuration.Preconditions;
 
 public struct HeroConfiguration
 {
-    public int Speed { get; set; }
-    public int SightRange { get; set; }
-    public int Stamina { get; set; }
+    public IncrementalRange Speed { get; set; }
+    public IncrementalRange SightRange { get; set; }
+    public IncrementalRange Stamina { get; set; }
 }

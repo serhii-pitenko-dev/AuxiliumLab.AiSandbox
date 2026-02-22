@@ -1,9 +1,9 @@
-﻿using AiSandBox.Ai;
+using AiSandBox.Ai;
 using AiSandBox.Ai.Configuration;
 using AiSandBox.AiTrainingOrchestrator.Configuration;
 using AiSandBox.AiTrainingOrchestrator.GrpcClients;
 using AiSandBox.AiTrainingOrchestrator.Trainers;
-using AiSandBox.ApplicationServices.Runner;
+using AiSandBox.ApplicationServices.Executors;
 using AiSandBox.ApplicationServices.Runner.LogsDto;
 using AiSandBox.ApplicationServices.Runner.LogsDto.Performance;
 using AiSandBox.ApplicationServices.Runner.TestPreconditionSet;
@@ -20,16 +20,16 @@ using AiSandBox.SharedBaseTypes.ValueObjects;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
-namespace AiSandBox.Startup.Runners;
+namespace AiSandBox.ApplicationServices.Trainer;
 
-internal class RunTraining
+public class TrainingRunner
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly TrainingSettings _trainingSettings;
     private readonly Sb3AlgorithmTypeProvider _algorithmTypeProvider;
     private readonly IPolicyTrainerClient _policyTrainerClient;
 
-    public RunTraining(
+    public TrainingRunner(
         IServiceProvider serviceProvider,
         TrainingSettings trainingSettings,
         Sb3AlgorithmTypeProvider algorithmTypeProvider,
@@ -117,7 +117,7 @@ internal class RunTraining
             {
                 // The first episode is started by Python calling Reset(gymId).
                 // Subsequent episodes are also started via the episode callback.
-                // RunTraining just waits for cancellation.
+                // TrainingRunner waits until cancellation is requested.
                 await Task.Delay(Timeout.Infinite, cancellationToken).ConfigureAwait(false);
             }, cancellationToken);
 
@@ -140,5 +140,3 @@ internal class RunTraining
         }
     }
 }
-
-

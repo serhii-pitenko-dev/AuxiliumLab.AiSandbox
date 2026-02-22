@@ -7,6 +7,8 @@ namespace AiSandBox.Domain.Playgrounds.Factories;
 
 public class PlaygroundFactory(IPlaygroundBuilder playgroundBuilder) : IPlaygroundFactory
 {
+    public static int PercentCalculation (int totalCells, int percent) => (totalCells * percent) / 100;
+
     public StandardPlayground CreateStandard(
         InitialAgentCharacters heroCharacters,
         InitialAgentCharacters enemyCharacters,
@@ -19,10 +21,10 @@ public class PlaygroundFactory(IPlaygroundBuilder playgroundBuilder) : IPlaygrou
         MapValidator.ValidateElementsProportion(percentOfBlocks, percentOfEnemies);
 
         return playgroundBuilder.SetMap(new MapSquareCells(width, height))
-            .PlaceBlocks(percentOfBlocks)
+            .PlaceBlocks(PercentCalculation(width * height, percentOfBlocks))
             .PlaceHero(heroCharacters)
             .PlaceExit()
-            .PlaceEnemies(percentOfEnemies, enemyCharacters)
+            .PlaceEnemies(PercentCalculation(width * height, percentOfEnemies), enemyCharacters)
             .FillCellGrid()
             .Build();
     }

@@ -2,6 +2,6 @@ namespace AiSandBox.Infrastructure.Configuration.Preconditions;
 
 public struct ElementsPercentages
 {
-    public int BlocksPercent { get; set; }
-    public int PercentOfEnemies { get; set; }
+    public IncrementalRange BlocksPercent { get; set; }
+    public IncrementalRange PercentOfEnemies { get; set; }
 }

@@ -2,6 +2,13 @@ namespace AiSandBox.Infrastructure.Configuration.Preconditions;
 
 public struct Size
 {
-    public int Width { get; set; }
-    public int Height { get; set; }
+    public IncrementalRange Width { get; set; }
+    public IncrementalRange Height { get; set; }
+
+    /// <summary>
+    /// When enabled, Width and Height are swept jointly instead of independently.
+    /// Individual <see cref="IncrementalPropertyNames.MapWidth"/> and
+    /// <see cref="IncrementalPropertyNames.MapHeight"/> sweeps are skipped.
+    /// </summary>
+    public IncrementalArea IncrementalArea { get; set; }
 }

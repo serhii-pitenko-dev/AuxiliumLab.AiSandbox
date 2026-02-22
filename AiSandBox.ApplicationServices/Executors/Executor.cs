@@ -1,4 +1,4 @@
-﻿using AiSandBox.Ai;
+using AiSandBox.Ai;
 using AiSandBox.ApplicationServices.Commands.Playground;
 using AiSandBox.ApplicationServices.Commands.Playground.CreatePlayground;
 using AiSandBox.ApplicationServices.Runner.LogsDto;
@@ -29,9 +29,9 @@ using Microsoft.Extensions.Options;
 #warning CONSOLE_PRESENTATION_DEBUG is OFF
 #endif
 
-namespace AiSandBox.ApplicationServices.Runner;
+namespace AiSandBox.ApplicationServices.Executors;
 
-public abstract class Executor: IExecutor
+public abstract class Executor : IExecutor
 {
     private readonly IPlaygroundCommandsHandleService _playgroundCommands;
     private readonly IMemoryDataManager<StandardPlayground> _playgroundRepository;
@@ -52,6 +52,12 @@ public abstract class Executor: IExecutor
     private SandboxStatus sandboxStatus;
     protected SandboxStatus SandboxStatus => sandboxStatus;
     private SandboxExecutionPerformance sandboxExecutionPerformance;
+
+    /// <summary>
+    /// The configuration active for the current run.
+    /// Falls back to the injected <see cref="_configuration"/> when no override is supplied via <see cref="RunAsync"/>.
+    /// </summary>
+    private SandBoxConfiguration _activeConfiguration;
 
 
     public Executor(
@@ -74,6 +80,7 @@ public abstract class Executor: IExecutor
         _playgroundCommands = mapCommands;
         _playgroundRepository = sandboxRepository;
         _configuration = configuration.Value;
+        _activeConfiguration = _configuration;
         _agentStateMemoryRepository = agentStateMemoryRepository;
         _messageBroker = messageBroker;
         _brokerRpcClient = brokerRpcClient;
@@ -92,11 +99,12 @@ public abstract class Executor: IExecutor
         await RunAsync(sandboxId);
     }
 
-    public virtual async Task RunAsync(Guid sandboxId = default)
+    public virtual async Task RunAsync(Guid sandboxId = default, SandBoxConfiguration sandBoxConfiguration = default)
     {
+        _activeConfiguration = sandBoxConfiguration ?? _configuration;
 
 #if PERFORMANCE_ANALYSIS
-            sandboxExecutionPerformance = new SandboxExecutionPerformance
+        sandboxExecutionPerformance = new SandboxExecutionPerformance
             {
                 Start = DateTime.UtcNow,
             };
@@ -106,9 +114,9 @@ public abstract class Executor: IExecutor
         if (sandboxId == default)
         {
             sandboxId = _playgroundCommands.CreatePlaygroundCommand.Handle(new CreatePlaygroundCommandParameters(
-                _configuration.MapSettings,
-                _configuration.Hero,
-                _configuration.Enemy
+                _activeConfiguration.MapSettings,
+                _activeConfiguration.Hero,
+                _activeConfiguration.Enemy
             ));
         }
 
@@ -124,7 +132,7 @@ public abstract class Executor: IExecutor
     /// </summary>
     protected virtual async Task StartSimulationPreparationsAsync()
     {
-        // Initialize AI modulef
+        // Initialize AI module
         _aiActions.Initialize();
         await SaveAsync();
 
@@ -154,7 +162,7 @@ public abstract class Executor: IExecutor
     {
         while (sandboxStatus == SandboxStatus.InProgress)
         {
-            if (_playground.Turn >= _configuration.MaxTurns)
+            if (_playground.Turn >= _activeConfiguration.MaxTurns.Current)
                 _messageBroker.Publish(new HeroLostEvent(Guid.NewGuid(), _playground.Id, LostReason.MaxTurnsReached));
 
             _playground.OnStartTurnActions();
@@ -399,34 +407,5 @@ public abstract class Executor: IExecutor
     {
         await _rawDataLogFileRepository.SaveOrAppendAsync(
                Guid.NewGuid(), new RawDataLog(Guid.NewGuid(), logMessage, DateTime.UtcNow));
-    }
-
-    /// <summary>
-    /// Subscribes to win/loss events, runs one simulation, unsubscribes, and returns the outcome.
-    /// Subclasses use this to build a <see cref="AiSandBox.Domain.Statistics.Result.SandboxRunResult"/>
-    /// without the base class needing any awareness of batch or result types.
-    /// </summary>
-    protected async Task<(WinReason? WinReason, LostReason? LostReason)> RunAndCaptureOutcomeAsync()
-    {
-        WinReason? winReason = null;
-        LostReason? lostReason = null;
-
-        void OnWon(HeroWonEvent e) { winReason = e.WinReason; }
-        void OnLost(HeroLostEvent e) { lostReason = e.LostReason; }
-
-        _messageBroker.Subscribe<HeroWonEvent>(OnWon);
-        _messageBroker.Subscribe<HeroLostEvent>(OnLost);
-
-        try
-        {
-            await RunAsync();
-        }
-        finally
-        {
-            _messageBroker.Unsubscribe<HeroWonEvent>(OnWon);
-            _messageBroker.Unsubscribe<HeroLostEvent>(OnLost);
-        }
-
-        return (winReason, lostReason);
     }
 }

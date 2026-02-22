@@ -3,21 +3,25 @@ using AiSandBox.Ai.Configuration;
 using AiSandBox.AiTrainingOrchestrator.Configuration;
 using AiSandBox.AiTrainingOrchestrator.GrpcClients;
 using AiSandBox.ApplicationServices.Configuration;
-using AiSandBox.ApplicationServices.Runner;
+using AiSandBox.ApplicationServices.Executors;
+using AiSandBox.ApplicationServices.Runner.MassRunner;
+using AiSandBox.ApplicationServices.Runner.SingleRunner;
+using AiSandBox.ApplicationServices.Trainer;
 using AiSandBox.Common.Extensions;
+using AiSandBox.ConsolePresentation;
 using AiSandBox.ConsolePresentation.Configuration;
 using AiSandBox.Domain.Configuration;
+using AiSandBox.Domain.Statistics.Result;
 using AiSandBox.GrpcHost.Services;
 using AiSandBox.Infrastructure.Configuration;
+using AiSandBox.Infrastructure.Configuration.Preconditions;
+using AiSandBox.Infrastructure.FileManager;
 using AiSandBox.SharedBaseTypes.ValueObjects.StartupSettings;
 using AiSandBox.Startup.Configuration;
 using AiSandBox.Startup.Menu;
-using AiSandBox.Startup.Runners;
-using AiSandBox.Domain.Statistics.Result;
-using AiSandBox.Infrastructure.FileManager;
-using AiSandBox.ConsolePresentation;
 using AiSandBox.WebApi.Configuration;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.Extensions.Options;
 
 
 // ── 1. Read default settings ─────────────────────────────────────────────────
@@ -48,7 +52,6 @@ builder.Services.AddInfrastructureServices(builder.Configuration);
 builder.Services.AddDomainServices();
 builder.Services.AddApplicationServices();
 builder.Services.AddAiSandBoxServices(startupSettings.ExecutionMode);
-builder.Services.AddControllers();
 
 // ── 4. Training-specific services ─────────────────────────────────────────────
 if (isTraining)
@@ -97,12 +100,14 @@ await app.StartAsync();
 
 try
 {
+    var sandboxConfiguration = app.Services.GetRequiredService<IOptions<SandBoxConfiguration>>();
+    
     switch (startupSettings.ExecutionMode)
     {
         // ── Training ──────────────────────────────────────────────────────────
         case ExecutionMode.Training:
         {
-            var runTraining = new RunTraining(
+            var runTraining = new TrainingRunner(
                 app.Services,
                 app.Services.GetRequiredService<TrainingSettings>(),
                 app.Services.GetRequiredService<Sb3AlgorithmTypeProvider>(),
@@ -120,7 +125,7 @@ try
             using var scope = app.Services.CreateScope();
             var executor = scope.ServiceProvider.GetRequiredService<IExecutorForPresentation>();
             var batchFileManager = scope.ServiceProvider.GetRequiredService<IFileDataManager<GeneralBatchRunInformation>>();
-            await new RunSimulations(batchFileManager).RunSingleAsync(executor);
+            await new SingleRunner(sandboxConfiguration.Value).RunSingleAsync(executor);
             break;
         }
 
@@ -128,9 +133,9 @@ try
         case ExecutionMode.MassRandomAISimulation:
         {
             using var scope = app.Services.CreateScope();
-            var executor = scope.ServiceProvider.GetRequiredService<IExecutorForPresentation>();
+            var executor = scope.ServiceProvider.GetRequiredService<IStandardExecutor>();
             var batchFileManager = scope.ServiceProvider.GetRequiredService<IFileDataManager<GeneralBatchRunInformation>>();
-            await new RunSimulations(batchFileManager).RunManyAsync(executor, startupSettings.SimulationCount);
+            await new MassRunner(batchFileManager, sandboxConfiguration).RunManyAsync(executor, startupSettings.SimulationCount);
             break;
         }
 
@@ -140,7 +145,7 @@ try
             using var scope = app.Services.CreateScope();
             var executor = scope.ServiceProvider.GetRequiredService<IExecutorForPresentation>();
             var batchFileManager = scope.ServiceProvider.GetRequiredService<IFileDataManager<GeneralBatchRunInformation>>();
-            await new RunSimulations(batchFileManager).RunTestPreconditionsAsync(executor);
+            await new SingleRunner(sandboxConfiguration.Value).RunTestPreconditionsAsync(executor);
             break;
         }
 
@@ -161,4 +166,3 @@ finally
     else
         await app.StopAsync();
 }
-

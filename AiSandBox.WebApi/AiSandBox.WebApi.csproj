@@ -10,8 +10,6 @@
     <PublishAot>false</PublishAot>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\AiSandBox.ConsolePresentation\AiSandBox.ConsolePresentation.csproj" />
-  </ItemGroup>
+
 
 </Project>

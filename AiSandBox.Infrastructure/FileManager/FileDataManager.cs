@@ -3,6 +3,7 @@ using AiSandBox.Domain.Maps;
 using AiSandBox.Infrastructure.Configuration.Preconditions;
 using AiSandBox.Infrastructure.Converters;
 using Microsoft.Extensions.Options;
+using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -12,6 +13,7 @@ public class FileDataManager<T>: IFileDataManager<T>
 {
     private readonly string _baseStorageDirectory;
     private readonly JsonSerializerOptions _jsonOptions;
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> _fileLocks = new();
     
     public FileDataManager(IOptions<SandBoxConfiguration> SandBoxSettings)
     {
@@ -65,7 +67,16 @@ public class FileDataManager<T>: IFileDataManager<T>
         };
 
         string jsonContent = JsonSerializer.Serialize(wrapper, _jsonOptions) + Environment.NewLine;
-        await File.AppendAllTextAsync(filePath, jsonContent);
+        var fileLock = _fileLocks.GetOrAdd(filePath, _ => new SemaphoreSlim(1, 1));
+        await fileLock.WaitAsync();
+        try
+        {
+            await File.AppendAllTextAsync(filePath, jsonContent);
+        }
+        finally
+        {
+            fileLock.Release();
+        }
     }
 
     public async Task SaveOrAppendAsync(Guid id, T obj)
@@ -83,8 +94,16 @@ public class FileDataManager<T>: IFileDataManager<T>
         }
         
         string jsonContent = JsonSerializer.Serialize(obj, _jsonOptions);
-        
-        await File.AppendAllTextAsync(filePath, jsonContent);
+        var fileLock = _fileLocks.GetOrAdd(filePath, _ => new SemaphoreSlim(1, 1));
+        await fileLock.WaitAsync();
+        try
+        {
+            await File.AppendAllTextAsync(filePath, jsonContent);
+        }
+        finally
+        {
+            fileLock.Release();
+        }
     }
 
     public async Task<T> LoadObjectAsync(Guid id)

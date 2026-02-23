@@ -18,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\AiSandBox.AiTrainingOrchestrator\AiSandBox.AiTrainingOrchestrator.csproj" />
     <ProjectReference Include="..\AiSandBox.Infrastructure\AiSandBox.Infrastructure.csproj" />
     <ProjectReference Include="..\AiSandBox.Common\AiSandBox.Common.csproj" />
   </ItemGroup>

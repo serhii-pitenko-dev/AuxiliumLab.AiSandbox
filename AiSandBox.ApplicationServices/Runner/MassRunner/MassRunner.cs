@@ -47,10 +47,24 @@ public class MassRunner
         SandBoxConfiguration? configuration = null,
         IEnumerable<string>? incrementalProperties = null)
     {
+        var startTime = DateTime.Now;
+        Console.WriteLine("═══════════════════════════════════════════════════════════════");
+        Console.WriteLine($"MASS RUNNER - Starting batch execution at {startTime:yyyy-MM-dd HH:mm:ss}");
+        Console.WriteLine("═══════════════════════════════════════════════════════════════");
+        
         configuration ??= _configuration;
         var propertiesToSweep = incrementalProperties?.ToList() ?? new List<string>();
 
         var batchRunId = Guid.NewGuid();
+        Console.WriteLine($"Batch Run ID: {batchRunId}");
+        Console.WriteLine($"Standard parallel runs: {count}");
+        Console.WriteLine($"Max parallelism: {Environment.ProcessorCount} threads");
+        if (propertiesToSweep.Any())
+        {
+            Console.WriteLine($"Incremental properties to sweep: {string.Join(", ", propertiesToSweep)}");
+        }
+        Console.WriteLine();
+        
         int wins = 0;
         int completedRuns = 0;
         long totalTurns = 0;
@@ -70,9 +84,18 @@ public class MassRunner
             MapArea: area
         );
 
+        Console.WriteLine("Configuration:");
+        Console.WriteLine($"  Map Size: {configuration.MapSettings.Size.Width} × {configuration.MapSettings.Size.Height} (Area: {area})");
+        Console.WriteLine($"  Blocks: {batchRunInfo.BlocksCount}, Enemies: {batchRunInfo.EnemiesCount}");
+        Console.WriteLine($"  Max Turns: {configuration.MaxTurns.Current}");
+        Console.WriteLine();
+
         await _batchResultFileManager.AppendObjectAsync(batchRunId, batchRunInfo);
 
         // ── Standard parallel runs ─────────────────────────────────────────────
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Starting {count} standard parallel runs...");
+        var standardRunsStartTime = DateTime.Now;
+        
         await Parallel.ForEachAsync(
             Enumerable.Range(0, count),
             options,
@@ -88,8 +111,18 @@ public class MassRunner
                     Interlocked.Increment(ref wins);
             });
 
+        var standardRunsDuration = DateTime.Now - standardRunsStartTime;
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Completed {count} standard runs in {standardRunsDuration.TotalSeconds:F2}s");
+        Console.WriteLine($"  Progress: {completedRuns} runs completed, {wins} wins");
+        Console.WriteLine();
+
         // ── Incremental sweep runs ─────────────────────────────────────────────
         bool areaEnabled = configuration.MapSettings.Size.IncrementalArea?.IsEnabled == true;
+
+        if (propertiesToSweep.Any())
+        {
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Starting incremental sweep runs...");
+        }
 
         foreach (var propertyName in propertiesToSweep)
         {
@@ -104,6 +137,8 @@ public class MassRunner
                 continue;
 
             int stepCount = range.StepCount;
+            Console.WriteLine($"  Sweeping '{propertyName}': {range.Min} to {range.Max}, step {range.Step} ({stepCount} runs)");
+            
             for (int i = 0; i < stepCount; i++)
             {
                 int currentValue = range.Min + i * range.Step;
@@ -117,6 +152,8 @@ public class MassRunner
                 if (result.WinReason.HasValue)
                     Interlocked.Increment(ref wins);
             }
+            
+            Console.WriteLine($"    Completed {stepCount} runs for '{propertyName}'");
         }
 
         // ── Joint area sweep (Width + Height stepped together) ─────────────────
@@ -129,6 +166,11 @@ public class MassRunner
             int heightRange = sz.Height.Max - sz.Height.Min;
             int biggerRange = Math.Max(widthRange, heightRange);
             int iterations  = areaStep > 0 ? biggerRange / areaStep : 0;
+
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Starting joint area sweep (Width + Height)...");
+            Console.WriteLine($"  Width range: {sz.Width.Min} to {sz.Width.Max}");
+            Console.WriteLine($"  Height range: {sz.Height.Min} to {sz.Height.Max}");
+            Console.WriteLine($"  Step: {areaStep}, Iterations: {iterations}");
 
             for (int i = 0; i < iterations; i++)
             {
@@ -145,12 +187,30 @@ public class MassRunner
                 if (result.WinReason.HasValue)
                     Interlocked.Increment(ref wins);
             }
+            
+            Console.WriteLine($"  Completed {iterations} area sweep runs");
+            Console.WriteLine();
         }
 
         // ── Summary ────────────────────────────────────────────────────────────
         int losses = completedRuns - wins;
         double avgTurns = completedRuns > 0 ? (double)totalTurns / completedRuns : 0;
         await _batchResultFileManager.AppendObjectAsync(batchRunId, new BatchSummary(completedRuns, wins, losses, avgTurns));
+        
+        var finishTime = DateTime.Now;
+        var totalDuration = finishTime - startTime;
+        
+        Console.WriteLine("═══════════════════════════════════════════════════════════════");
+        Console.WriteLine($"MASS RUNNER - Batch execution completed at {finishTime:yyyy-MM-dd HH:mm:ss}");
+        Console.WriteLine("═══════════════════════════════════════════════════════════════");
+        Console.WriteLine($"Total Duration: {totalDuration.TotalSeconds:F2}s ({totalDuration:hh\\:mm\\:ss})");
+        Console.WriteLine($"Total Runs: {completedRuns}");
+        Console.WriteLine($"Wins: {wins} ({(completedRuns > 0 ? (wins * 100.0 / completedRuns) : 0):F1}%)");
+        Console.WriteLine($"Losses: {losses} ({(completedRuns > 0 ? (losses * 100.0 / completedRuns) : 0):F1}%)");
+        Console.WriteLine($"Average Turns: {avgTurns:F2}");
+        Console.WriteLine($"Total Turns: {totalTurns:N0}");
+        Console.WriteLine($"Average Duration per Run: {(completedRuns > 0 ? totalDuration.TotalSeconds / completedRuns : 0):F3}s");
+        Console.WriteLine("═══════════════════════════════════════════════════════════════");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

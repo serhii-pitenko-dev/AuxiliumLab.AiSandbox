@@ -2,10 +2,12 @@
 using AiSandBox.Domain.Validation;
 using AiSandBox.Domain.Playgrounds.Builders;
 using AiSandBox.Domain.Maps;
+using AiSandBox.Domain.Agents.Factories;
+using AiSandBox.Domain.Agents.Services.Vision;
 
 namespace AiSandBox.Domain.Playgrounds.Factories;
 
-public class PlaygroundFactory(IPlaygroundBuilder playgroundBuilder) : IPlaygroundFactory
+public class PlaygroundFactory() : IPlaygroundFactory
 {
     public static int PercentCalculation (int totalCells, int percent) => (totalCells * percent) / 100;
 
@@ -17,6 +19,9 @@ public class PlaygroundFactory(IPlaygroundBuilder playgroundBuilder) : IPlaygrou
         int percentOfBlocks = 10,
         int percentOfEnemies = 0)
     {
+        // initialize builder for every playground creation to avoid multithreading issues with shared builder instance
+        IPlaygroundBuilder playgroundBuilder = InitializePlaygroundBuilder();
+
         MapValidator.ValidateSize(width, height);
         MapValidator.ValidateElementsProportion(percentOfBlocks, percentOfEnemies);
 
@@ -27,6 +32,15 @@ public class PlaygroundFactory(IPlaygroundBuilder playgroundBuilder) : IPlaygrou
             .PlaceEnemies(PercentCalculation(width * height, percentOfEnemies), enemyCharacters)
             .FillCellGrid()
             .Build();
+    }
+
+    private IPlaygroundBuilder InitializePlaygroundBuilder()
+    {
+        IEnemyFactory enemyFactory = new EnemyFactory();
+        IHeroFactory heroFactory = new HeroFactory();
+        IVisibilityService visibilityService = new VisibilityService();
+
+        return new PlaygroundBuilder(enemyFactory, heroFactory, visibilityService);
     }
 }
 

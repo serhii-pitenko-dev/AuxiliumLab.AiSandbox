@@ -22,12 +22,21 @@ public class StandardPlayground
     private readonly List<Enemy> _enemies = [];
     private readonly MapSquareCells _map;
 
-    public StandardPlayground(MapSquareCells map, IVisibilityService visibilityService)
+    public StandardPlayground(MapSquareCells map, IVisibilityService visibilityService, Guid? id = null, int? turn = null)
     {
         _map = map;
         _visibilityService = visibilityService ?? throw new ArgumentNullException(nameof(visibilityService));
-    }
 
+        if (id.HasValue)
+        {
+            Id = id.Value;
+        }
+
+        if (turn.HasValue)
+        {
+            Turn = turn.Value;
+        }
+    }
     public void OnStartTurnActions()
     {
         Turn++;
@@ -69,7 +78,7 @@ public class StandardPlayground
     public void PlaceExit(Exit exit, Coordinates coordinates)
     {
         Exit = exit;
-        _map.PlaceObject(exit, coordinates);
+        _map.PlaceObject(Exit, coordinates);
     }
 
     public void AddBlock(Block block, Coordinates coordinates)

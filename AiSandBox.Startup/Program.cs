@@ -26,14 +26,16 @@ using Microsoft.Extensions.Options;
 
 
 // ── 1. Read settings early (before building host) ────────────────────────────
-
-StartupSettings startupSettings =
-    new ConfigurationBuilder()
+var configuration = new ConfigurationBuilder()
     .SetBasePath(Directory.GetCurrentDirectory())
     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
     .AddEnvironmentVariables()
     .AddCommandLine(args)
-    .Build().GetSection("StartupSettings").Get<StartupSettings>()
+    .Build();
+
+
+StartupSettings startupSettings =
+    configuration.GetSection("StartupSettings").Get<StartupSettings>()
     ?? new StartupSettings();
 
 ModelType? selectedAlgorithm = null;
@@ -64,9 +66,6 @@ if (isTraining)
     host = GrpcTrainingHost.Build(args, builder =>
     {
         RegisterCoreServices(builder.Services, builder.Configuration, startupSettings.ExecutionMode);
-
-        if (isConsole)
-            builder.Services.AddConsolePresentationServices(builder.Configuration, builder.Configuration);
     });
 }
 else
@@ -78,7 +77,7 @@ else
         .ConfigureAppConfiguration((_, cfgBuilder) =>
         {
             if (isConsole)
-                cfgBuilder.AddJsonFile("Settings.json", optional: false, reloadOnChange: true);
+                cfgBuilder.AddConsoleConfigurationFile();
         })
         .ConfigureServices((ctx, services) =>
         {
@@ -137,9 +136,9 @@ try
         case ExecutionMode.MassRandomAISimulation:
         {
             using var scope = host.Services.CreateScope();
-            var executor = scope.ServiceProvider.GetRequiredService<IStandardExecutor>();
+            var executorFactory = scope.ServiceProvider.GetRequiredService<IExecutorFactory>();
             var batchFileManager = scope.ServiceProvider.GetRequiredService<IFileDataManager<GeneralBatchRunInformation>>();
-            await new MassRunner(batchFileManager, sandboxConfiguration).RunManyAsync(executor, startupSettings.SimulationCount);
+            await new MassRunner(batchFileManager, sandboxConfiguration).RunManyAsync(executorFactory, startupSettings.SimulationCount);
             break;
         }
 

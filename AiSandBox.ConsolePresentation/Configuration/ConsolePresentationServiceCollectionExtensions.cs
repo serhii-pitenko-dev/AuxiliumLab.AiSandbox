@@ -7,18 +7,12 @@ namespace AiSandBox.ConsolePresentation.Configuration;
 
 public static class ConsolePresentationServiceCollectionExtensions
 {
-    /// <summary>
-    /// Registers console presentation services and adds Settings.json to the configuration pipeline.
-    /// Use this overload when the caller owns an <see cref="IConfigurationBuilder"/>
-    /// (e.g. <c>WebApplicationBuilder.Configuration</c>).
-    /// </summary>
-    public static IServiceCollection AddConsolePresentationServices
-        (this IServiceCollection services, 
-         IConfiguration configuration,
-         IConfigurationBuilder configurationBuilder)
+    public static void AddConsoleConfigurationFile(this IConfigurationBuilder configurationBuilder)
     {
-        configurationBuilder.AddJsonFile("Settings.json", optional: false, reloadOnChange: true);
-        return services.AddConsolePresentationServices(configuration);
+        var assemblyLocation = Path.GetDirectoryName(
+            typeof(ConsolePresentationServiceCollectionExtensions).Assembly.Location)!;
+        configurationBuilder.AddJsonFile(
+            Path.Combine(assemblyLocation, "Settings.json"), optional: false, reloadOnChange: true);
     }
 
     /// <summary>

@@ -59,9 +59,8 @@ public abstract class Executor : IExecutor
     /// </summary>
     private SandBoxConfiguration _activeConfiguration;
 
-
     public Executor(
-        IPlaygroundCommandsHandleService mapCommands,
+        IPlaygroundCommandsHandleService playgroundCommandsHandleService,
         IMemoryDataManager<StandardPlayground> sandboxRepository,
         IAiActions aiActions,
         IOptions<SandBoxConfiguration> configuration,
@@ -77,7 +76,7 @@ public abstract class Executor : IExecutor
         IFileDataManager<SandboxExecutionPerformance> sandboxExecutionPerformanceFileRepository,
         ITestPreconditionData testPreconditionData)
     {
-        _playgroundCommands = mapCommands;
+        _playgroundCommands = playgroundCommandsHandleService;
         _playgroundRepository = sandboxRepository;
         _configuration = configuration.Value;
         _activeConfiguration = _configuration;
@@ -163,8 +162,12 @@ public abstract class Executor : IExecutor
         while (sandboxStatus == SandboxStatus.InProgress)
         {
             if (_playground.Turn >= _activeConfiguration.MaxTurns.Current)
+            {
                 _messageBroker.Publish(new HeroLostEvent(Guid.NewGuid(), _playground.Id, LostReason.MaxTurnsReached));
-
+                sandboxStatus = SandboxStatus.TurnLimitReached;
+                break;
+            }
+               
             _playground.OnStartTurnActions();
 
 #if PERFORMANCE_ANALYSIS

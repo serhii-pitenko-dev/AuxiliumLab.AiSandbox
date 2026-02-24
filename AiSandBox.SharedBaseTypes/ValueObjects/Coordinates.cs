@@ -1,6 +1,6 @@
 ﻿namespace AiSandBox.SharedBaseTypes.ValueObjects;
 
-public readonly struct Coordinates
+public class Coordinates
 {
     public int X { get; init; }
     public int Y { get; init; }

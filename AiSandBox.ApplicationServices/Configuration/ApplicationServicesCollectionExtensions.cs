@@ -47,8 +47,9 @@ public static class ApplicationServicesCollectionExtensions
 
         services.AddSingleton<IStandardPlaygroundMapper, StandardPlaygroundMapper>();
 
-        services.AddScoped<IExecutorForPresentation, ExecutorForPresentation>();
-        services.AddScoped<IStandardExecutor, StandardExecutor>();
+        services.AddTransient<IExecutorFactory, ExecutorFactory>();
+        services.AddTransient<IExecutorForPresentation>(provider => provider.GetRequiredService<IExecutorFactory>().CreateExecutorForPresentation());
+        services.AddTransient<IStandardExecutor>(provider => provider.GetRequiredService<IExecutorFactory>().CreateStandardExecutor());
 
         services.AddSingleton<ITestPreconditionData, TestPreconditionData>();
 

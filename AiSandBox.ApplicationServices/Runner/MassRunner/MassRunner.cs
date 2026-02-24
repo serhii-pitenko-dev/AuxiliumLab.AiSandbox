@@ -42,7 +42,7 @@ public class MassRunner
     ///   Pass <see langword="null"/> or an empty enumerable to skip incremental runs entirely.
     /// </param>
     public async Task RunManyAsync(
-        IStandardExecutor executor,
+        IExecutorFactory executorFactory,
         int count,
         SandBoxConfiguration? configuration = null,
         IEnumerable<string>? incrementalProperties = null)
@@ -101,7 +101,7 @@ public class MassRunner
             options,
             async (_, _) =>
             {
-                var result = await executor.RunAndCaptureAsync(configuration);
+                var result = await executorFactory.CreateStandardExecutor().RunAndCaptureAsync(configuration);
 
                 await _batchResultFileManager.AppendObjectAsync(batchRunId, result);
 
@@ -144,7 +144,7 @@ public class MassRunner
                 int currentValue = range.Min + i * range.Step;
                 var overriddenConfig = WithPropertyOverride(configuration, propertyName, currentValue);
 
-                var result = await executor.RunAndCaptureAsync(overriddenConfig);
+                var result = await executorFactory.CreateStandardExecutor().RunAndCaptureAsync(overriddenConfig);
                 await _batchResultFileManager.AppendObjectAsync(batchRunId, result);
 
                 Interlocked.Increment(ref completedRuns);
@@ -179,7 +179,7 @@ public class MassRunner
 
                 var overriddenConfig = WithAreaOverride(configuration, wValue, hValue);
 
-                var result = await executor.RunAndCaptureAsync(overriddenConfig);
+                var result = await executorFactory.CreateStandardExecutor().RunAndCaptureAsync(overriddenConfig);
                 await _batchResultFileManager.AppendObjectAsync(batchRunId, result);
 
                 Interlocked.Increment(ref completedRuns);

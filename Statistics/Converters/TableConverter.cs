@@ -23,8 +23,9 @@ public static class TableConverter
         sb.AppendLine("Property,Value");
         sb.AppendLine($"PolicyType,{Escape(settings.PolicyType)}");
         sb.AppendLine($"ExecutionMode,{Escape(settings.ExecutionMode)}");
-        sb.AppendLine($"SimulationCount,{settings.SimulationCount}");
-        sb.AppendLine($"IncrementalProperties,{Escape(string.Join(";", settings.IncrementalProperties))}");
+        sb.AppendLine($"StandardSimulationCount,{settings.StandardSimulationCount}");
+        sb.AppendLine($"IncrementalSimulationCount,{settings.IncrementalProperties.SimulationCount}");
+        sb.AppendLine($"IncrementalProperties,{Escape(string.Join(";", settings.IncrementalProperties.Properties))}");
         return sb.ToString();
     }
 
@@ -58,13 +59,12 @@ public static class TableConverter
 
     /// <summary>
     /// Converts a list of <see cref="BatchSummary"/> to a CSV table where
-    /// rows are property names (Id, TotalRuns, Wins, Losses, AverageTurns)
-    /// and each column corresponds to one <see cref="BatchSummary"/> identified by its <see cref="BatchSummary.Id"/>.
+    /// rows are property names and each column corresponds to one phase batch.
     /// </summary>
     public static string ToCsv(IList<BatchSummary> batches)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("# Batch Summary");
+        sb.AppendLine("# Batch Summaries");
 
         if (batches.Count == 0)
         {
@@ -72,18 +72,33 @@ public static class TableConverter
             return sb.ToString();
         }
 
-        // Header row: "Property", then each batch Id
+        // Header row: "Property", then each batch Description as column header
         var headerParts = new List<string> { "Property" };
-        headerParts.AddRange(batches.Select(b => Escape(b.Id.ToString())));
+        headerParts.AddRange(batches.Select(b => Escape(b.Description)));
         sb.AppendLine(string.Join(",", headerParts));
 
-        // Data rows (transposed)
+        // Data rows (transposed — each row is a property, each column is a batch)
         AppendTransposedRow(sb, "Id",           batches, b => Escape(b.Id.ToString()));
+        AppendTransposedRow(sb, "Description",  batches, b => Escape(b.Description));
         AppendTransposedRow(sb, "TotalRuns",    batches, b => b.TotalRuns.ToString());
         AppendTransposedRow(sb, "Wins",         batches, b => b.Wins.ToString());
         AppendTransposedRow(sb, "Losses",       batches, b => b.Losses.ToString());
         AppendTransposedRow(sb, "AverageTurns", batches, b => b.AverageTurns.ToString("F2"));
 
+        return sb.ToString();
+    }
+
+    /// <summary>
+    /// Converts a <see cref="MassRunSummary"/> to a CSV property/value table.
+    /// </summary>
+    public static string ToCsv(MassRunSummary summary)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine("# Mass Run Summary");
+        sb.AppendLine("Property,Value");
+        sb.AppendLine($"BatchesCount,{summary.BatchesCount}");
+        sb.AppendLine($"TimeExecution,{Escape(summary.TimeExecution.ToString(@"hh\:mm\:ss\.fff"))}");
+        sb.AppendLine($"Description,{Escape(summary.Description)}");
         return sb.ToString();
     }
 

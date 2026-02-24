@@ -150,17 +150,20 @@ try
             // Map startup settings (excluding IsPreconditionStart and PresentationMode)
             var simulationStartupSettings = new SimulationStartupSettings
             {
-                PolicyType            = startupSettings.PolicyType.ToString(),
-                ExecutionMode         = startupSettings.ExecutionMode.ToString(),
-                SimulationCount       = startupSettings.SimulationCount,
-                IncrementalProperties = startupSettings.IncrementalProperties,
+                PolicyType              = startupSettings.PolicyType.ToString(),
+                ExecutionMode           = startupSettings.ExecutionMode.ToString(),
+                StandardSimulationCount = startupSettings.StandardSimulationCount,
+                IncrementalProperties   = new SimulationIncrementalPropertiesSettings
+                {
+                    SimulationCount = startupSettings.IncrementalProperties.SimulationCount,
+                    Properties      = startupSettings.IncrementalProperties.Properties,
+                },
             };
 
             await new MassRunner(batchFileManager, statisticFileManager, sandboxConfiguration)
                 .RunManyAsync(
                     executorFactory,
-                    startupSettings.SimulationCount,
-                    incrementalProperties: startupSettings.IncrementalProperties,
+                    startupSettings.StandardSimulationCount,
                     startupSettings: simulationStartupSettings);
             break;
         }

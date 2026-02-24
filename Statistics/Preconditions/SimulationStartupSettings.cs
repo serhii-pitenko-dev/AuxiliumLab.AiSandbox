@@ -14,8 +14,8 @@ public class SimulationStartupSettings
     public string ExecutionMode { get; set; } = string.Empty;
 
     /// <summary>Number of standard (baseline) simulation runs.</summary>
-    public int SimulationCount { get; set; }
+    public int StandardSimulationCount { get; set; }
 
-    /// <summary>Property names that are swept incrementally during the run.</summary>
-    public List<string> IncrementalProperties { get; set; } = [];
+    /// <summary>Incremental sweep settings: simulation count per step and property names.</summary>
+    public SimulationIncrementalPropertiesSettings IncrementalProperties { get; set; } = new();
 }

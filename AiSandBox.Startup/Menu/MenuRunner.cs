@@ -117,6 +117,7 @@ internal class MenuRunner : IMenuRunner
         TestPreconditionsEnabled = s.TestPreconditionsEnabled,
         IsWebApiEnabled = s.IsWebApiEnabled,
         PolicyType = s.PolicyType,
-        SimulationCount = s.SimulationCount
+        StandardSimulationCount = s.StandardSimulationCount,
+        IncrementalProperties = s.IncrementalProperties
     };
 }

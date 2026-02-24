@@ -16,7 +16,7 @@ public class StartupSettings
     public bool TestPreconditionsEnabled { get; set; }
     public bool IsWebApiEnabled { get; set; }
     public AiPolicy PolicyType { get; set; }
-    public int SimulationCount { get; set; } = 1;
-    public List<string> IncrementalProperties { get; set; } = [];
+    public int StandardSimulationCount { get; set; } = 1;
+    public IncrementalPropertiesSettings IncrementalProperties { get; set; } = new();
 }
 

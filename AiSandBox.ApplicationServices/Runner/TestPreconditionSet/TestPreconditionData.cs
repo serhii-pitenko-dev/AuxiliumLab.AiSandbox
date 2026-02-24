@@ -58,7 +58,7 @@ public class TestPreconditionData(IMemoryDataManager<StandardPlayground> playgro
 
         StandardPlayground standardPlayground = CreatePlayground();
         Hero hero = CreateHero();
-        standardPlayground.PlaceHero(hero, heroCoordinates.Value);
+        standardPlayground.PlaceHero(hero, heroCoordinates);
 
         foreach (var enemyCoordinates in enemies)
         {

@@ -1,4 +1,4 @@
-﻿using AiSandBox.Ai;
+using AiSandBox.Ai;
 using AiSandBox.ApplicationServices.Commands.Playground;
 using AiSandBox.ApplicationServices.Commands.Playground.CreatePlayground;
 using AiSandBox.ApplicationServices.Runner.LogsDto;
@@ -29,9 +29,9 @@ using Microsoft.Extensions.Options;
 #warning CONSOLE_PRESENTATION_DEBUG is OFF
 #endif
 
-namespace AiSandBox.ApplicationServices.Runner;
+namespace AiSandBox.ApplicationServices.Executors;
 
-public abstract class Executor: IExecutor
+public abstract class Executor : IExecutor
 {
     private readonly IPlaygroundCommandsHandleService _playgroundCommands;
     private readonly IMemoryDataManager<StandardPlayground> _playgroundRepository;
@@ -50,11 +50,17 @@ public abstract class Executor: IExecutor
     protected ITestPreconditionData _testPreconditionData;
 
     private SandboxStatus sandboxStatus;
+    protected SandboxStatus SandboxStatus => sandboxStatus;
     private SandboxExecutionPerformance sandboxExecutionPerformance;
 
+    /// <summary>
+    /// The configuration active for the current run.
+    /// Falls back to the injected <see cref="_configuration"/> when no override is supplied via <see cref="RunAsync"/>.
+    /// </summary>
+    private SandBoxConfiguration _activeConfiguration;
 
     public Executor(
-        IPlaygroundCommandsHandleService mapCommands,
+        IPlaygroundCommandsHandleService playgroundCommandsHandleService,
         IMemoryDataManager<StandardPlayground> sandboxRepository,
         IAiActions aiActions,
         IOptions<SandBoxConfiguration> configuration,
@@ -70,9 +76,10 @@ public abstract class Executor: IExecutor
         IFileDataManager<SandboxExecutionPerformance> sandboxExecutionPerformanceFileRepository,
         ITestPreconditionData testPreconditionData)
     {
-        _playgroundCommands = mapCommands;
+        _playgroundCommands = playgroundCommandsHandleService;
         _playgroundRepository = sandboxRepository;
         _configuration = configuration.Value;
+        _activeConfiguration = _configuration;
         _agentStateMemoryRepository = agentStateMemoryRepository;
         _messageBroker = messageBroker;
         _brokerRpcClient = brokerRpcClient;
@@ -82,7 +89,7 @@ public abstract class Executor: IExecutor
         _rawDataLogFileRepository = rawDataLogFileRepository;
         _turnExecutionPerformanceFileRepository = turnExecutionPerformanceFileRepository;
         _sandboxExecutionPerformanceFileRepository = sandboxExecutionPerformanceFileRepository;
-        _testPreconditionData = testPreconditionData;   
+        _testPreconditionData = testPreconditionData;
     }
 
     public async Task TestRunWithPreconditionsAsync()
@@ -91,11 +98,12 @@ public abstract class Executor: IExecutor
         await RunAsync(sandboxId);
     }
 
-    public async Task RunAsync(Guid sandboxId = default)
+    public virtual async Task RunAsync(Guid sandboxId = default, SandBoxConfiguration sandBoxConfiguration = default)
     {
+        _activeConfiguration = sandBoxConfiguration ?? _configuration;
 
 #if PERFORMANCE_ANALYSIS
-            sandboxExecutionPerformance = new SandboxExecutionPerformance
+        sandboxExecutionPerformance = new SandboxExecutionPerformance
             {
                 Start = DateTime.UtcNow,
             };
@@ -105,9 +113,9 @@ public abstract class Executor: IExecutor
         if (sandboxId == default)
         {
             sandboxId = _playgroundCommands.CreatePlaygroundCommand.Handle(new CreatePlaygroundCommandParameters(
-                _configuration.MapSettings,
-                _configuration.Hero,
-                _configuration.Enemy
+                _activeConfiguration.MapSettings,
+                _activeConfiguration.Hero,
+                _activeConfiguration.Enemy
             ));
         }
 
@@ -123,7 +131,7 @@ public abstract class Executor: IExecutor
     /// </summary>
     protected virtual async Task StartSimulationPreparationsAsync()
     {
-        // Initialize AI modulef
+        // Initialize AI module
         _aiActions.Initialize();
         await SaveAsync();
 
@@ -153,9 +161,13 @@ public abstract class Executor: IExecutor
     {
         while (sandboxStatus == SandboxStatus.InProgress)
         {
-            if (_playground.Turn >= _configuration.MaxTurns)
+            if (_playground.Turn >= _activeConfiguration.MaxTurns.Current)
+            {
                 _messageBroker.Publish(new HeroLostEvent(Guid.NewGuid(), _playground.Id, LostReason.MaxTurnsReached));
-
+                sandboxStatus = SandboxStatus.TurnLimitReached;
+                break;
+            }
+               
             _playground.OnStartTurnActions();
 
 #if PERFORMANCE_ANALYSIS

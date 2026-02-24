@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\AiSandBox.SharedBaseTypes\AiSandBox.SharedBaseTypes.csproj" />
+    <ProjectReference Include="..\AiSandBox.Common\AiSandBox.Common.csproj" />
   </ItemGroup>
 
 </Project>

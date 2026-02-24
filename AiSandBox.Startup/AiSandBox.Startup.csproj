@@ -34,6 +34,7 @@
     <ProjectReference Include="..\AiSandBox.ApplicationServices\AiSandBox.ApplicationServices.csproj" />
     <ProjectReference Include="..\AiSandBox.Common\AiSandBox.Common.csproj" />
     <ProjectReference Include="..\AiSandBox.Domain\AiSandBox.Domain.csproj" />
+    <ProjectReference Include="..\AiSandBox.ConsolePresentation\AiSandBox.ConsolePresentation.csproj" />
     <ProjectReference Include="..\AiSandBox.GrpcHost\AiSandBox.GrpcHost.csproj" />
     <ProjectReference Include="..\AiSandBox.Infrastructure\AiSandBox.Infrastructure.csproj" />
     <ProjectReference Include="..\AiSandBox.WebApi\AiSandBox.WebApi.csproj" />

@@ -1,4 +1,5 @@
-var builder = WebApplication.CreateSlimBuilder(args);
+using AiSandBox.WebApi;
 
-var app = builder.Build();
+// Entry point when running AiSandBox.WebApi as a standalone process
+await WebApiHost.RunAsync(args);
 

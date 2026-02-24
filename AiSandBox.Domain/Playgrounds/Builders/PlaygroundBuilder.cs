@@ -17,6 +17,8 @@ public class PlaygroundBuilder(
     private Guid? _playgroundId;
     private int? _turn;
 
+    public int Test { get; set; } = 0;
+
     public StandardPlayground Playground
     {
         get
@@ -34,22 +36,9 @@ public class PlaygroundBuilder(
 
     public IPlaygroundBuilder SetMap(MapSquareCells tileMap)
     {
-        Playground = new StandardPlayground(tileMap, visibilityService);
+        Playground = new StandardPlayground(tileMap, visibilityService, _playgroundId, _turn);
+        _playgroundId = Playground.Id;
         _enemyOrderCounter = 1; // Reset counter when creating new playground
-
-        // Apply stored playground ID if set
-        if (_playgroundId.HasValue)
-        {
-            var idProperty = typeof(StandardPlayground).GetProperty(nameof(StandardPlayground.Id));
-            idProperty?.SetValue(Playground, _playgroundId.Value);
-        }
-
-        // Apply stored turn if set
-        if (_turn.HasValue)
-        {
-            var turnProperty = typeof(StandardPlayground).GetProperty(nameof(StandardPlayground.Turn));
-            turnProperty?.SetValue(Playground, _turn.Value);
-        }
 
         return this;
     }
@@ -82,13 +71,13 @@ public class PlaygroundBuilder(
         return this;
     }
 
-    public IPlaygroundBuilder PlaceBlocks(int percentOfBlocks)
+    public IPlaygroundBuilder PlaceBlocks(int blocksCount)
     {
-        int totalBlocks = (int)(Playground.MapArea * (percentOfBlocks / 100.0));
+        Test++;
         var random = new Random();
         var occupiedCells = new HashSet<(int x, int y)>();
 
-        while (Playground.Blocks.Count < totalBlocks)
+        while (Playground.Blocks.Count < blocksCount)
         {
             int x = random.Next(0, Playground.MapWidth);
             int y = random.Next(0, Playground.MapHeight);
@@ -166,12 +155,11 @@ public class PlaygroundBuilder(
         return this;
     }
 
-    public IPlaygroundBuilder PlaceEnemies(int percentOfEnemies, InitialAgentCharacters enemyCharacters)
+    public IPlaygroundBuilder PlaceEnemies(int enemiesCount, InitialAgentCharacters enemyCharacters)
     {
         var random = new Random();
-        int numberOfEnemies = (int)(Playground.MapArea * (percentOfEnemies / 100.0));
 
-        for (int i = 0; i < numberOfEnemies; i++)
+        for (int i = 0; i < enemiesCount; i++)
         {
             int x, y;
             bool validPosition;

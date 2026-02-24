@@ -16,7 +16,6 @@
     <PackageReference Include="Grpc.Tools" Version="2.70.0" PrivateAssets="All" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" Version="9.0.10" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="9.0.10" />
-    <PackageReference Include="System.Management" Version="10.0.3" />
   </ItemGroup>
 
   <ItemGroup>

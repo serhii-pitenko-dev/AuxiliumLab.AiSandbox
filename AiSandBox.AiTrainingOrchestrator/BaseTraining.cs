@@ -1,5 +1,6 @@
 ﻿using AiSandBox.Ai.Configuration;
 using AiSandBox.AiTrainingOrchestrator.Configuration;
+using AiSandBox.Common.Helpers;
 
 namespace AiSandBox.AiTrainingOrchestrator;
 
@@ -13,7 +14,7 @@ public abstract class BaseTraining
     {
         if (isSameMachine)
         {
-            PhysicalCores = Helpers.SystemInfo.GetPhysicalCoreCount();
+            PhysicalCores = SystemInfo.GetPhysicalCoreCount();
         }
         else
         {

@@ -10,13 +10,13 @@ public interface IPlaygroundBuilder
     IPlaygroundBuilder SetMap(MapSquareCells tileMap);
     IPlaygroundBuilder SetPlaygroundId(Guid id);
     IPlaygroundBuilder SetTurn(int turn);
-    IPlaygroundBuilder PlaceBlocks(int percentOfBlocks);
+    IPlaygroundBuilder PlaceBlocks(int blocksCount);
     IPlaygroundBuilder PlaceBlock(Block block, Coordinates coordinates);
     IPlaygroundBuilder PlaceHero(InitialAgentCharacters heroCharacters);
     IPlaygroundBuilder PlaceHero(Hero hero, Coordinates coordinates);
     IPlaygroundBuilder PlaceExit();
     IPlaygroundBuilder PlaceExit(Exit exit, Coordinates coordinates);
-    IPlaygroundBuilder PlaceEnemies(int percentOfEnemies, InitialAgentCharacters enemyCharacters);
+    IPlaygroundBuilder PlaceEnemies(int enemiesCount, InitialAgentCharacters enemyCharacters);
     IPlaygroundBuilder PlaceEnemy(Enemy enemy, Coordinates coordinates);
     IPlaygroundBuilder FillCellGrid();
     StandardPlayground Build();

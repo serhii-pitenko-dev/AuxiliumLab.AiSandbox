@@ -7,6 +7,11 @@ public class NullFileDataManager<T> : IFileDataManager<T>
         return Task.CompletedTask;
     }
 
+    public Task AppendObjectAsync(Guid id, object obj)
+    {
+        return Task.CompletedTask;
+    }
+
     public void Clear()
     {
 

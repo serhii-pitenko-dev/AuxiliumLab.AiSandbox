@@ -5,6 +5,7 @@ namespace AiSandBox.Domain.Statistics.Result;
 /// Saved once after all runs in the batch have completed.
 /// </summary>
 public record BatchSummary(
+    Guid Id,
     int TotalRuns,
     int Wins,
     int Losses,

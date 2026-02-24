@@ -19,6 +19,8 @@ using AiSandBox.Infrastructure.FileManager;
 using AiSandBox.SharedBaseTypes.ValueObjects.StartupSettings;
 using AiSandBox.Startup.Configuration;
 using AiSandBox.Startup.Menu;
+using AiSandBox.Statistics.Preconditions;
+using AiSandBox.Statistics.StatisticDataManager;
 using AiSandBox.WebApi;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
@@ -138,7 +140,28 @@ try
             using var scope = host.Services.CreateScope();
             var executorFactory = scope.ServiceProvider.GetRequiredService<IExecutorFactory>();
             var batchFileManager = scope.ServiceProvider.GetRequiredService<IFileDataManager<GeneralBatchRunInformation>>();
-            await new MassRunner(batchFileManager, sandboxConfiguration).RunManyAsync(executorFactory, startupSettings.SimulationCount);
+
+            // Build the CSV storage folder: FileSource.Path / MASS_RUN_STATISTICS
+            string massRunStatsFolder = System.IO.Path.Combine(
+                sandboxConfiguration.Value.MapSettings.FileSource.Path,
+                "MASS_RUN_STATISTICS");
+            var statisticFileManager = new StatisticFileDataManager(massRunStatsFolder);
+
+            // Map startup settings (excluding IsPreconditionStart and PresentationMode)
+            var simulationStartupSettings = new SimulationStartupSettings
+            {
+                PolicyType            = startupSettings.PolicyType.ToString(),
+                ExecutionMode         = startupSettings.ExecutionMode.ToString(),
+                SimulationCount       = startupSettings.SimulationCount,
+                IncrementalProperties = startupSettings.IncrementalProperties,
+            };
+
+            await new MassRunner(batchFileManager, statisticFileManager, sandboxConfiguration)
+                .RunManyAsync(
+                    executorFactory,
+                    startupSettings.SimulationCount,
+                    incrementalProperties: startupSettings.IncrementalProperties,
+                    startupSettings: simulationStartupSettings);
             break;
         }
 

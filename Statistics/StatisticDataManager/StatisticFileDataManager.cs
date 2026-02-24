@@ -27,5 +27,11 @@ public class StatisticFileDataManager : IStatisticFileDataManager
 
         return System.IO.File.AppendAllTextAsync(filePath, jsonData + Environment.NewLine);
     }
+
+    public Task ConvertToCsvAndAppendAsync(string fileName, string csvContent)
+    {
+        string filePath = System.IO.Path.Combine(folder, fileName);
+        return System.IO.File.AppendAllTextAsync(filePath, csvContent);
+    }
 }
 

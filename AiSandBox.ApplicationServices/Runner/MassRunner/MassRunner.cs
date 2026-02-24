@@ -3,6 +3,9 @@ using AiSandBox.Domain.Playgrounds.Factories;
 using AiSandBox.Domain.Statistics.Result;
 using AiSandBox.Infrastructure.Configuration.Preconditions;
 using AiSandBox.Infrastructure.FileManager;
+using AiSandBox.Statistics.Converters;
+using AiSandBox.Statistics.Preconditions;
+using AiSandBox.Statistics.StatisticDataManager;
 using Microsoft.Extensions.Options;
 
 namespace AiSandBox.ApplicationServices.Runner.MassRunner;
@@ -13,14 +16,17 @@ namespace AiSandBox.ApplicationServices.Runner.MassRunner;
 public class MassRunner
 {
     private readonly IFileDataManager<GeneralBatchRunInformation> _batchResultFileManager;
+    private readonly IStatisticFileDataManager _statisticFileManager;
     private readonly SandBoxConfiguration _configuration;
 
     public MassRunner(
         IFileDataManager<GeneralBatchRunInformation> batchResultFileManager,
+        IStatisticFileDataManager statisticFileManager,
         IOptions<SandBoxConfiguration> configuration)
     {
         _batchResultFileManager = batchResultFileManager;
-        _configuration = configuration.Value;
+        _statisticFileManager   = statisticFileManager;
+        _configuration          = configuration.Value;
     }
 
     /// <summary>
@@ -45,7 +51,8 @@ public class MassRunner
         IExecutorFactory executorFactory,
         int count,
         SandBoxConfiguration? configuration = null,
-        IEnumerable<string>? incrementalProperties = null)
+        IEnumerable<string>? incrementalProperties = null,
+        SimulationStartupSettings? startupSettings = null)
     {
         var startTime = DateTime.Now;
         Console.WriteLine("═══════════════════════════════════════════════════════════════");
@@ -64,6 +71,30 @@ public class MassRunner
             Console.WriteLine($"Incremental properties to sweep: {string.Join(", ", propertiesToSweep)}");
         }
         Console.WriteLine();
+
+        // ── Save preconditions CSV ─────────────────────────────────────────────
+        var sandBoxPreconditions = BuildSandBoxSettings(configuration);
+        string csvFileName = $"{batchRunId}.csv";
+
+        if (startupSettings is not null)
+        {
+            await _statisticFileManager.ConvertToCsvAndAppendAsync(
+                csvFileName,
+                TableConverter.ToCsv(startupSettings));
+
+            await _statisticFileManager.ConvertToCsvAndAppendAsync(
+                csvFileName,
+                Environment.NewLine);
+        }
+
+        await _statisticFileManager.ConvertToCsvAndAppendAsync(
+            csvFileName,
+            TableConverter.ToCsv(sandBoxPreconditions));
+
+        await _statisticFileManager.ConvertToCsvAndAppendAsync(
+            csvFileName,
+            Environment.NewLine);
+        // ── End preconditions CSV ─────────────────────────────────────────────
         
         int wins = 0;
         int completedRuns = 0;
@@ -144,7 +175,7 @@ public class MassRunner
                 int currentValue = range.Min + i * range.Step;
                 var overriddenConfig = WithPropertyOverride(configuration, propertyName, currentValue);
 
-                var result = await executorFactory.CreateStandardExecutor().RunAndCaptureAsync(overriddenConfig);
+                ParticularRun result = await executorFactory.CreateStandardExecutor().RunAndCaptureAsync(overriddenConfig);
                 await _batchResultFileManager.AppendObjectAsync(batchRunId, result);
 
                 Interlocked.Increment(ref completedRuns);
@@ -195,7 +226,14 @@ public class MassRunner
         // ── Summary ────────────────────────────────────────────────────────────
         int losses = completedRuns - wins;
         double avgTurns = completedRuns > 0 ? (double)totalTurns / completedRuns : 0;
-        await _batchResultFileManager.AppendObjectAsync(batchRunId, new BatchSummary(completedRuns, wins, losses, avgTurns));
+        var batchSummary = new BatchSummary(batchRunId, completedRuns, wins, losses, avgTurns);
+        await _batchResultFileManager.AppendObjectAsync(batchRunId, batchSummary);
+
+        // ── Save batch summary CSV ─────────────────────────────────────────────
+        await _statisticFileManager.ConvertToCsvAndAppendAsync(
+            csvFileName,
+            TableConverter.ToCsv(new List<BatchSummary> { batchSummary }));
+        // ── End batch summary CSV ─────────────────────────────────────────────
         
         var finishTime = DateTime.Now;
         var totalDuration = finishTime - startTime;
@@ -214,6 +252,32 @@ public class MassRunner
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Maps the relevant fields of <paramref name="cfg"/> to a <see cref="SimulationSandBoxSettings"/>
+    /// for CSV export, omitting TotalRuns, SaveToFileRegularity, TurnTimeout, FileSource and Type.
+    /// </summary>
+    private static SimulationSandBoxSettings BuildSandBoxSettings(SandBoxConfiguration cfg)
+    {
+        static RangeSettings Map(IncrementalRange r) => new(r.Min, r.Current, r.Max, r.Step);
+
+        return new SimulationSandBoxSettings
+        {
+            MaxTurns              = Map(cfg.MaxTurns),
+            MapWidth              = Map(cfg.MapSettings.Size.Width),
+            MapHeight             = Map(cfg.MapSettings.Size.Height),
+            IncrementalAreaEnabled = cfg.MapSettings.Size.IncrementalArea?.IsEnabled ?? false,
+            IncrementalAreaStep    = cfg.MapSettings.Size.IncrementalArea?.Step ?? 0,
+            BlocksPercent         = Map(cfg.MapSettings.ElementsPercentages.BlocksPercent),
+            PercentOfEnemies      = Map(cfg.MapSettings.ElementsPercentages.PercentOfEnemies),
+            HeroSpeed             = Map(cfg.Hero.Speed),
+            HeroSightRange        = Map(cfg.Hero.SightRange),
+            HeroStamina           = Map(cfg.Hero.Stamina),
+            EnemySpeed            = Map(cfg.Enemy.Speed),
+            EnemySightRange       = Map(cfg.Enemy.SightRange),
+            EnemyStamina          = Map(cfg.Enemy.Stamina),
+        };
+    }
 
     /// <summary>
     /// Returns the <see cref="IncrementalRange"/> for the given property name, or <see langword="null"/>

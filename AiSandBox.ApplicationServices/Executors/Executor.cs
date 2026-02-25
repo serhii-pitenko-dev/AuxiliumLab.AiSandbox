@@ -145,7 +145,7 @@ public abstract class Executor : IExecutor
         CancellationToken cancellationToken = new CancellationToken();
         try
         {
-           await CreateRawLog($"Playground with id {_playground.Id} started.");
+           //await CreateRawLog($"Playground with id {_playground.Id} started.");
 
            await StartSimulationAsync(cancellationToken);
         }
@@ -264,8 +264,8 @@ public abstract class Executor : IExecutor
 
     private async Task SaveAsync()
     {
-        var dataToSave = _standardPlaygroundMapper.ToState(_playground);
-        await _playgroundStateFileRepository.SaveOrAppendAsync(_playground.Id, dataToSave);
+        //var dataToSave = _standardPlaygroundMapper.ToState(_playground);
+        //await _playgroundStateFileRepository.SaveOrAppendAsync(_playground.Id, dataToSave);
     }
 
 

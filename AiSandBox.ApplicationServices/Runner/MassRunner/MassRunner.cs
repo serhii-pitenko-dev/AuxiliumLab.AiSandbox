@@ -56,6 +56,10 @@ public class MassRunner
         Console.WriteLine($"MASS RUNNER - Starting batch execution at {startTime:yyyy-MM-dd HH:mm:ss}");
         Console.WriteLine("═══════════════════════════════════════════════════════════════");
 
+        // Pre-warm the thread pool to avoid injection delay; ensures cores are available immediately.
+        int minWorkers = Environment.ProcessorCount * 2;
+        ThreadPool.SetMinThreads(minWorkers, minWorkers);
+
         configuration ??= _configuration;
         var propertiesToSweep      = startupSettings?.IncrementalProperties.Properties ?? [];
         int incrementalSimCount    = startupSettings?.IncrementalProperties.SimulationCount ?? 1;
@@ -68,40 +72,32 @@ public class MassRunner
         await SavePreconditionsCsvAsync(configuration, startupSettings, csvFileName);
         await SaveBatchRunInfoAsync(configuration, batchRunId);
 
-        var options = new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount };
-
-        var standardResult  = await RunStandardPhaseAsync(executorFactory, configuration, batchRunId, count, options);
-        var sweepResults    = await RunIncrementalSweepPhaseAsync(executorFactory, configuration, batchRunId, propertiesToSweep, areaEnabled, incrementalSimCount);
-        var areaSweepResult = areaEnabled
-            ? await RunAreaSweepPhaseAsync(executorFactory, configuration, batchRunId)
+        var standardBatch    = await RunStandardPhaseAsync(executorFactory, configuration, batchRunId, count);
+        var sweepSummaries   = await RunIncrementalSweepPhaseAsync(executorFactory, configuration, batchRunId, propertiesToSweep, areaEnabled, incrementalSimCount);
+        var areaSweepSummary = areaEnabled
+            ? await RunAreaSweepPhaseAsync(executorFactory, configuration, batchRunId, sweepSummaries.Count + 1)
             : null;
 
-        // Build one BatchSummary per executed phase (skip empty area sweep slot)
-        var allPhaseResults = new List<PhaseResult> { standardResult };
-        allPhaseResults.AddRange(sweepResults);
-        if (areaSweepResult is not null)
-            allPhaseResults.Add(areaSweepResult);
+        // Aggregate totals across all batches for footer output
+        var allBatches = new List<BatchSummary> { standardBatch };
+        allBatches.AddRange(sweepSummaries.SelectMany(s => s.Batches));
+        if (areaSweepSummary is not null)
+            allBatches.AddRange(areaSweepSummary.Batches);
 
-        var batchSummaries = allPhaseResults
-            .Select(r => new BatchSummary(
-                Guid.NewGuid(),
-                r.Completed,
-                r.Wins,
-                r.Completed - r.Wins,
-                r.Completed > 0 ? (double)r.TotalTurns / r.Completed : 0,
-                r.Description))
-            .ToList();
-
-        int totalWins      = allPhaseResults.Sum(r => r.Wins);
-        int totalCompleted = allPhaseResults.Sum(r => r.Completed);
-        long totalTurns    = allPhaseResults.Sum(r => r.TotalTurns);
+        int totalWins      = allBatches.Sum(b => b.Wins);
+        int totalCompleted = allBatches.Sum(b => b.TotalRuns);
+        long totalTurns    = allBatches.Sum(b => (long)Math.Round(b.AverageTurns * b.TotalRuns));
 
         var massRunSummary = new MassRunSummary(
-            batchSummaries.Count,
+            1 + sweepSummaries.Count + (areaSweepSummary is not null ? 1 : 0),
             DateTime.Now - startTime,
-            string.Join("; ", batchSummaries.Select(b => b.Description)));
+            string.Join("; ", sweepSummaries.Select(s => s.Property)));
 
-        await AppendBatchSummariesCsvAsync(csvFileName, batchSummaries);
+        await AppendStandardRunCsvAsync(csvFileName, standardBatch);
+        foreach (var sweep in sweepSummaries)
+            await AppendIncrementalRunSummaryCsvAsync(csvFileName, sweep);
+        if (areaSweepSummary is not null)
+            await AppendIncrementalRunSummaryCsvAsync(csvFileName, areaSweepSummary);
         await AppendMassRunSummaryCsvAsync(csvFileName, massRunSummary);
 
         LogBatchFooter(startTime, totalCompleted, totalWins, totalTurns);
@@ -161,42 +157,28 @@ public class MassRunner
 
     // ── Step 4: standard parallel runs ────────────────────────────────────────
 
-    private async Task<PhaseResult> RunStandardPhaseAsync(
+    private async Task<BatchSummary> RunStandardPhaseAsync(
         IExecutorFactory executorFactory,
         SandBoxConfiguration configuration,
         Guid batchRunId,
-        int count,
-        ParallelOptions options)
+        int count)
     {
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Starting {count} standard parallel runs...");
         var phaseStart = DateTime.Now;
 
-        int wins = 0, completed = 0;
-        long totalTurns = 0;
+        var (wins, completed, turns) = await RunSimulationsAsync(executorFactory, configuration, count);
 
-        await Parallel.ForEachAsync(
-            Enumerable.Range(0, count),
-            options,
-            async (_, _) =>
-            {
-                var result = await executorFactory.CreateStandardExecutor().RunAndCaptureAsync(configuration);
-
-                Interlocked.Increment(ref completed);
-                Interlocked.Add(ref totalTurns, result.TurnsCount);
-                if (result.WinReason.HasValue)
-                    Interlocked.Increment(ref wins);
-            });
-
-        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Completed {count} standard runs in {(DateTime.Now - phaseStart).TotalSeconds:F2}s");
+        var execTime = DateTime.Now - phaseStart;
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Completed {count} standard runs in {execTime.TotalSeconds:F2}s");
         Console.WriteLine($"  Progress: {completed} runs completed, {wins} wins");
         Console.WriteLine();
 
-        return new PhaseResult(wins, completed, totalTurns, $"Standard parallel runs ({count} runs)");
+        return BuildBatchSummary(1, completed, wins, turns, configuration.MaxTurns.Current, execTime);
     }
 
     // ── Step 5: incremental named-property sweep ───────────────────────────────
 
-    private async Task<IReadOnlyList<PhaseResult>> RunIncrementalSweepPhaseAsync(
+    private async Task<IReadOnlyList<IncrementalRunSummary>> RunIncrementalSweepPhaseAsync(
         IExecutorFactory executorFactory,
         SandBoxConfiguration configuration,
         Guid batchRunId,
@@ -209,7 +191,8 @@ public class MassRunner
 
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Starting incremental sweep runs...");
 
-        var results = new List<PhaseResult>();
+        var summaries   = new List<IncrementalRunSummary>();
+        int sweepNumber = 1;
 
         foreach (var propertyName in propertiesToSweep)
         {
@@ -223,42 +206,73 @@ public class MassRunner
             if (range is null)
                 continue;
 
-            int stepCount = range.StepCount;
-            Console.WriteLine($"  Sweeping '{propertyName}': {range.Min} to {range.Max}, step {range.Step} ({stepCount} steps × {simulationCount} runs each = {stepCount * simulationCount} total)");
+            int stepCount  = range.StepCount;
+            int totalTasks = stepCount * simulationCount;
+            Console.WriteLine($"  Sweeping '{propertyName}': {range.Min} to {range.Max}, step {range.Step} ({stepCount} steps × {simulationCount} runs each = {totalTasks} total)");
 
+            var propStart = DateTime.Now;
+
+            // Pre-build per-step configs and Interlocked-safe counter arrays.
+            var configs       = new SandBoxConfiguration[stepCount];
+            var stepWins      = new int[stepCount];
+            var stepCompleted = new int[stepCount];
+            var stepTurns     = new long[stepCount];
+            var stepEnds      = new DateTime[stepCount]; // set by the last sim of each step
+
+            for (int idx = 0; idx < stepCount; idx++)
+                configs[idx] = WithPropertyOverride(configuration, propertyName, range.Min + idx * range.Step);
+
+            Console.WriteLine($"    [{DateTime.Now:HH:mm:ss}] Scheduling all {totalTasks} tasks as a flat queue ({stepCount} steps × {simulationCount} runs)...");
+
+            // Flat queue: all stepCount × simulationCount tasks are submitted to the thread pool at once.
+            // This keeps all cores busy regardless of per-step duration variance — when short steps
+            // finish early, their threads immediately pick up pending long-step tasks from the queue.
+            var allTasks = Enumerable.Range(0, stepCount).SelectMany(i =>
+                Enumerable.Range(0, simulationCount).Select(_ => Task.Run(async () =>
+                {
+                    var result = await executorFactory.CreateStandardExecutor().RunAndCaptureAsync(configs[i]);
+                    Interlocked.Add(ref stepTurns[i], result.TurnsCount);
+                    if (result.WinReason.HasValue)
+                        Interlocked.Increment(ref stepWins[i]);
+                    // Record end time when the last simulation of this step finishes.
+                    if (Interlocked.Increment(ref stepCompleted[i]) == simulationCount)
+                        stepEnds[i] = DateTime.Now;
+                })));
+
+            await Task.WhenAll(allTasks);
+
+            var batchSlots = new BatchSummary[stepCount];
             for (int i = 0; i < stepCount; i++)
             {
-                int currentValue    = range.Min + i * range.Step;
-                var overriddenConfig = WithPropertyOverride(configuration, propertyName, currentValue);
-
-                int stepWins = 0, stepCompleted = 0;
-                long stepTurns = 0;
-
-                for (int s = 0; s < simulationCount; s++)
-                {
-                    var result = await executorFactory.CreateStandardExecutor().RunAndCaptureAsync(overriddenConfig);
-                    stepCompleted++;
-                    stepTurns += result.TurnsCount;
-                    if (result.WinReason.HasValue)
-                        stepWins++;
-                }
-
-                results.Add(new PhaseResult(stepWins, stepCompleted, stepTurns,
-                    $"Sweep '{propertyName}'={currentValue} ({simulationCount} runs)"));
+                var end = stepEnds[i] == default ? DateTime.Now : stepEnds[i];
+                batchSlots[i] = BuildBatchSummary(
+                    i + 1, stepCompleted[i], stepWins[i], stepTurns[i],
+                    configs[i].MaxTurns.Current, end - propStart);
             }
 
-            Console.WriteLine($"    Completed {stepCount * simulationCount} runs for '{propertyName}' ({stepCount} steps)");
+            var batches      = batchSlots.ToList();
+            var propExecTime = DateTime.Now - propStart;
+            Console.WriteLine($"    [{DateTime.Now:HH:mm:ss}] Completed {totalTasks} runs for '{propertyName}' ({stepCount} steps) in {propExecTime.TotalSeconds:F1}s");
+
+            summaries.Add(new IncrementalRunSummary(
+                Guid.NewGuid(), sweepNumber, batches,
+                $"Sweep '{propertyName}': {range.Min} to {range.Max}, step {range.Step} ({stepCount} steps × {simulationCount} runs)",
+                propExecTime, propertyName, simulationCount,
+                range.Min.ToString(), range.Step.ToString(), range.Max.ToString()));
+
+            sweepNumber++;
         }
 
-        return results;
+        return summaries;
     }
 
     // ── Step 6: joint area sweep (Width + Height together) ────────────────────
 
-    private async Task<PhaseResult> RunAreaSweepPhaseAsync(
+    private async Task<IncrementalRunSummary> RunAreaSweepPhaseAsync(
         IExecutorFactory executorFactory,
         SandBoxConfiguration configuration,
-        Guid batchRunId)
+        Guid batchRunId,
+        int startNumber)
     {
         var sz       = configuration.MapSettings.Size;
         int areaStep = configuration.MapSettings.Size.IncrementalArea!.Step;
@@ -271,34 +285,45 @@ public class MassRunner
         Console.WriteLine($"  Height range: {sz.Height.Min} to {sz.Height.Max}");
         Console.WriteLine($"  Step: {areaStep}, Iterations: {iterations}");
 
-        int wins = 0, completed = 0;
-        long totalTurns = 0;
+        var areaStart = DateTime.Now;
+        var batches   = new List<BatchSummary>(iterations);
 
         for (int i = 0; i < iterations; i++)
         {
-            int wValue = Math.Min(sz.Width.Min  + i * areaStep, sz.Width.Max);
-            int hValue = Math.Min(sz.Height.Min + i * areaStep, sz.Height.Max);
+            int wValue    = Math.Min(sz.Width.Min  + i * areaStep, sz.Width.Max);
+            int hValue    = Math.Min(sz.Height.Min + i * areaStep, sz.Height.Max);
+            var stepStart = DateTime.Now;
+            var result    = await executorFactory.CreateStandardExecutor().RunAndCaptureAsync(WithAreaOverride(configuration, wValue, hValue));
+            int stepWins  = result.WinReason.HasValue ? 1 : 0;
 
-            var result = await executorFactory.CreateStandardExecutor().RunAndCaptureAsync(WithAreaOverride(configuration, wValue, hValue));
-
-            completed++;
-            totalTurns += result.TurnsCount;
-            if (result.WinReason.HasValue)
-                wins++;
+            batches.Add(new BatchSummary(
+                Guid.NewGuid(), i + 1, 1, stepWins, 1 - stepWins,
+                result.TurnsCount,
+                configuration.MaxTurns.Current,
+                DateTime.Now - stepStart));
         }
 
         Console.WriteLine($"  Completed {iterations} area sweep runs");
         Console.WriteLine();
 
-        return new PhaseResult(wins, completed, totalTurns,
-            $"Joint area sweep (Width {sz.Width.Min}→{sz.Width.Max}, Height {sz.Height.Min}→{sz.Height.Max}, step {areaStep}, {iterations} runs)");
+        return new IncrementalRunSummary(
+            Guid.NewGuid(), startNumber, batches,
+            $"Joint area sweep (Width {sz.Width.Min}→{sz.Width.Max}, Height {sz.Height.Min}→{sz.Height.Max}, step {areaStep})",
+            DateTime.Now - areaStart, "Area (Width+Height)", 1,
+            sz.Width.Min.ToString(), areaStep.ToString(), sz.Width.Max.ToString());
     }
 
-    // ── Step 7: persist and CSV-export batch summaries ────────────────────────
+    // ── Step 7: persist and CSV-export summaries ──────────────────────────────
 
-    private async Task AppendBatchSummariesCsvAsync(string csvFileName, IList<BatchSummary> batchSummaries)
+    private async Task AppendStandardRunCsvAsync(string csvFileName, BatchSummary batch)
     {
-        await _statisticFileManager.ConvertToCsvAndAppendAsync(csvFileName, TableConverter.ToCsv(batchSummaries));
+        await _statisticFileManager.ConvertToCsvAndAppendAsync(csvFileName, TableConverter.ToCsv(batch));
+        await _statisticFileManager.ConvertToCsvAndAppendAsync(csvFileName, Environment.NewLine);
+    }
+
+    private async Task AppendIncrementalRunSummaryCsvAsync(string csvFileName, IncrementalRunSummary summary)
+    {
+        await _statisticFileManager.ConvertToCsvAndAppendAsync(csvFileName, TableConverter.ToCsv(summary));
         await _statisticFileManager.ConvertToCsvAndAppendAsync(csvFileName, Environment.NewLine);
     }
 
@@ -330,6 +355,35 @@ public class MassRunner
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Runs <paramref name="count"/> simulations concurrently using <c>Task.Run</c> + <c>Task.WhenAll</c>
+    /// (forces real thread-pool threads for CPU-bound work) and returns aggregate counters.
+    /// </summary>
+    private static async Task<(int Wins, int TotalRuns, long TotalTurns)> RunSimulationsAsync(
+        IExecutorFactory factory, SandBoxConfiguration config, int count)
+    {
+        int wins = 0, completed = 0;
+        long turns = 0;
+        var tasks = Enumerable.Range(0, count).Select(_ => Task.Run(async () =>
+        {
+            var result = await factory.CreateStandardExecutor().RunAndCaptureAsync(config);
+            Interlocked.Increment(ref completed);
+            Interlocked.Add(ref turns, result.TurnsCount);
+            if (result.WinReason.HasValue)
+                Interlocked.Increment(ref wins);
+        }));
+        await Task.WhenAll(tasks);
+        return (wins, completed, turns);
+    }
+
+    /// <summary>Constructs a <see cref="BatchSummary"/> from raw aggregated counters.</summary>
+    private static BatchSummary BuildBatchSummary(
+        int number, int totalRuns, int wins, long totalTurns, int maxTurns, TimeSpan execTime)
+        => new BatchSummary(
+            Guid.NewGuid(), number, totalRuns, wins, totalRuns - wins,
+            totalRuns > 0 ? (double)totalTurns / totalRuns : 0,
+            maxTurns, execTime);
 
     /// <summary>
     /// Maps the relevant fields of <paramref name="cfg"/> to a <see cref="SimulationSandBoxSettings"/>
@@ -524,8 +578,3 @@ public class MassRunner
     }
 }
 
-/// <summary>Aggregated run counts returned by each execution phase of <see cref="MassRunner"/>.</summary>
-internal record PhaseResult(int Wins, int Completed, long TotalTurns, string Description)
-{
-    public static readonly PhaseResult Empty = new(0, 0, 0, string.Empty);
-}

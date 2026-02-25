@@ -6,8 +6,10 @@ namespace AiSandBox.Domain.Statistics.Result;
 /// </summary>
 public record BatchSummary(
     Guid Id,
+    int Number,
     int TotalRuns,
     int Wins,
     int Losses,
     double AverageTurns,
-    string Description);
+    int MaxTurns,
+    TimeSpan ExecutionTime);

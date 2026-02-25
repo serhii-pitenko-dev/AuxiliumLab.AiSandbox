@@ -58,32 +58,65 @@ public static class TableConverter
     }
 
     /// <summary>
-    /// Converts a list of <see cref="BatchSummary"/> to a CSV table where
-    /// rows are property names and each column corresponds to one phase batch.
+    /// Converts a single <see cref="BatchSummary"/> (standard run) to a CSV property/value table.
     /// </summary>
-    public static string ToCsv(IList<BatchSummary> batches)
+    public static string ToCsv(BatchSummary batch)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("# Batch Summaries");
+        sb.AppendLine("# Standard Run");
+        sb.AppendLine("Property,Value");
+        sb.AppendLine($"Id,{Escape(batch.Id.ToString())}");
+        sb.AppendLine($"Number,{batch.Number}");
+        sb.AppendLine($"TotalRuns,{batch.TotalRuns}");
+        sb.AppendLine($"Wins,{batch.Wins}");
+        sb.AppendLine($"Losses,{batch.Losses}");
+        sb.AppendLine($"AverageTurns,{batch.AverageTurns:F2}");
+        sb.AppendLine($"MaxTurns,{batch.MaxTurns}");
+        sb.AppendLine($"ExecutionTime,{Escape(batch.ExecutionTime.ToString(@"hh\:mm\:ss\.fff"))}");
+        return sb.ToString();
+    }
 
-        if (batches.Count == 0)
+    /// <summary>
+    /// Converts an <see cref="IncrementalRunSummary"/> to its CSV section.
+    /// First block: key/value metadata rows; second block: transposed batch table.
+    /// </summary>
+    public static string ToCsv(IncrementalRunSummary run)
+    {
+        var sb = new StringBuilder();
+        sb.AppendLine($"# Incremental Run {run.Number}");
+        sb.AppendLine($"Number,{run.Number}");
+        sb.AppendLine($"Id,{Escape(run.Id.ToString())}");
+        sb.AppendLine($"Description,{Escape(run.Description)}");
+        sb.AppendLine($"Property name,{Escape(run.Property)}");
+        sb.AppendLine($"Execution time,{Escape(run.ExecutionTime.ToString(@"hh\:mm\:ss\.fff"))}");
+        sb.AppendLine($"BatchRunCount,{run.BatchRunCount}");
+        sb.AppendLine($"Min,{Escape(run.Min)}");
+        sb.AppendLine($"Step,{Escape(run.Step)}");
+        sb.AppendLine($"Max,{Escape(run.Max)}");
+        sb.AppendLine();
+
+        if (run.Batches.Count == 0)
         {
             sb.AppendLine("(no batch data)");
             return sb.ToString();
         }
 
-        // Header row: "Property", then each batch Description as column header
-        var headerParts = new List<string> { "Property" };
-        headerParts.AddRange(batches.Select(b => Escape(b.Description)));
-        sb.AppendLine(string.Join(",", headerParts));
+        // Header: label column + one column per batch (numbered by batch.Number)
+        var header = new List<string> { "Step" };
+        header.AddRange(run.Batches.Select(b => b.Number.ToString()));
+        sb.AppendLine(string.Join(",", header));
 
-        // Data rows (transposed — each row is a property, each column is a batch)
-        AppendTransposedRow(sb, "Id",           batches, b => Escape(b.Id.ToString()));
-        AppendTransposedRow(sb, "Description",  batches, b => Escape(b.Description));
-        AppendTransposedRow(sb, "TotalRuns",    batches, b => b.TotalRuns.ToString());
-        AppendTransposedRow(sb, "Wins",         batches, b => b.Wins.ToString());
-        AppendTransposedRow(sb, "Losses",       batches, b => b.Losses.ToString());
-        AppendTransposedRow(sb, "AverageTurns", batches, b => b.AverageTurns.ToString("F2"));
+        // Transposed batch table rows
+        AppendBatchRow(sb, "Id",              run.Batches, b => Escape(b.Id.ToString()));
+        AppendBatchRow(sb, "Wins",            run.Batches, b => b.Wins.ToString());
+        AppendBatchRow(sb, "Losses",          run.Batches, b => b.Losses.ToString());
+        AppendBatchRow(sb, "AverageTurns",    run.Batches, b => b.AverageTurns.ToString("F2"));
+        AppendBatchRow(sb, "MaxTurns",        run.Batches, b => b.MaxTurns.ToString());
+        AppendBatchRow(sb, "ExecutionTime",   run.Batches, b => Escape(b.ExecutionTime.ToString(@"hh\:mm\:ss\.fff")));
+        AppendBatchRow(sb, "AvgTurnExecTime", run.Batches, b =>
+            b.AverageTurns > 0
+                ? $"{b.ExecutionTime.TotalMilliseconds / b.AverageTurns:F3}ms"
+                : "N/A");
 
         return sb.ToString();
     }
@@ -110,10 +143,10 @@ public static class TableConverter
     private static void AppendScalar(StringBuilder sb, string name, string value)
         => sb.AppendLine($"{Escape(name)},,{Escape(value)},,");
 
-    private static void AppendTransposedRow(
+    private static void AppendBatchRow(
         StringBuilder sb,
         string rowLabel,
-        IList<BatchSummary> batches,
+        IReadOnlyList<BatchSummary> batches,
         Func<BatchSummary, string> selector)
     {
         var parts = new List<string> { Escape(rowLabel) };

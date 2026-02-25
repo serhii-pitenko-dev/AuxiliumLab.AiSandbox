@@ -1,6 +1,0 @@
-﻿using AiSandBox.Infrastructure.Configuration.Preconditions;
-
-namespace AiSandBox.ApplicationServices.Commands.Playground.CreatePlayground;
-
-public readonly record struct CreatePlaygroundCommandParameters(MapConfiguration MapConfiguration, HeroConfiguration HeroConfiguration, EnemyConfiguration EnemyConfiguration);
-

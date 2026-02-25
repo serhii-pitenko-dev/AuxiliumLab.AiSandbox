@@ -1,4 +1,4 @@
-namespace AiSandBox.Domain.Statistics.Result;
+namespace AuxiliumLab.AiSandbox.Domain.Statistics.Result;
 
 /// <summary>
 /// Aggregated summary for an entire mass run (all phases combined).

@@ -1,1 +1,0 @@
-dotnet run --project AiSandbox/AiSandBox.Startup/AiSandBox.Startup.csproj --configuration Release

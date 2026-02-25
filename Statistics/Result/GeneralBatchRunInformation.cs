@@ -1,4 +1,4 @@
-namespace AiSandBox.Domain.Statistics.Result;
+namespace AuxiliumLab.AiSandbox.Domain.Statistics.Result;
 
 /// <summary>
 /// Contains general information about the map/playground configuration shared across all runs in a batch.

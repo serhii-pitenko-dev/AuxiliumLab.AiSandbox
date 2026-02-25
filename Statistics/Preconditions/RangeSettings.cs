@@ -1,4 +1,4 @@
-namespace AiSandBox.Statistics.Preconditions;
+namespace AuxiliumLab.AiSandbox.Statistics.Preconditions;
 
 /// <summary>
 /// Represents an incremental range setting mirroring <c>IncrementalRange</c>,

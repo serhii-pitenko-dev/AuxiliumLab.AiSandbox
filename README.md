@@ -1,4 +1,4 @@
-﻿# AiSandbox
+# AuxiliumLab.AiSandbox
 Simulation engine written in .NET.
 
 ## Goal

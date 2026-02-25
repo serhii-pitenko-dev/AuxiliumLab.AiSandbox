@@ -1,4 +1,4 @@
-namespace AiSandBox.Domain.Statistics.Result;
+namespace AuxiliumLab.AiSandbox.Domain.Statistics.Result;
 
 /// <summary>
 /// The combined result of a single sandbox execution:

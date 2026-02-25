@@ -1,4 +1,4 @@
-namespace AiSandBox.Statistics.Preconditions;
+namespace AuxiliumLab.AiSandbox.Statistics.Preconditions;
 
 /// <summary>
 /// Captures the sandbox configuration relevant to a mass run simulation.

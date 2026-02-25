@@ -1,102 +1,101 @@
-# AuxiliumLab.AiSandbox gRPC Host
+# AuxiliumLab.AiSandbox.GrpcHost
 
-ASP.NET Core gRPC server exposing the simulation environment for external control.
+**Onion layer: Presentation / Host**  
+ASP.NET Core gRPC server that exposes the C# simulation as a **Gymnasium-compatible environment** for the Python SB3 training service.  
+Depends on: `Common`, `SharedBaseTypes`.
 
-## Quick Start
+## Purpose
+During AI training, the Python `ExternalSimEnv` needs to call `reset()` and `step()` on a live simulation. This project hosts those calls as gRPC endpoints.
 
-### Run the Server
+The gRPC host listens on **port 50062** (Kestrel) and is started only when `ExecutionMode = Training`.
 
-```bash
-dotnet run
+## Architecture
+
+```
+Python SB3 Service
+  ExternalSimEnv
+    └─ GrpcExternalEnvAdapter (localhost:50062)
+         │                             .NET GrpcHost
+         ├─ reset(gym_id, seed)  ──►  SimulationService.Reset()
+         │                               └─ Publishes RequestSimulationResetCommand via IMessageBroker
+         │                                    └─ TrainingExecutor handles → resets playground
+         │                               ◄─ SimulationResetResponse → returns observation
+         │
+         └─ step(gym_id, action) ──►  SimulationService.Step()
+                                          └─ Publishes RequestSimulationStepCommand via IMessageBroker
+                                               └─ TrainingExecutor executes action → runs one turn
+                                          ◄─ SimulationStepResponse → returns obs/reward/done/info
 ```
 
-The server will start on `http://localhost:50051`.
+The `gym_id` (GUID) maps each Python gym instance to one `TrainingExecutor` running in the .NET process.
 
-## Service Endpoints
+## Services
 
-### SimulationService
+### `SimulationService` (gRPC)
+Implements `SimulationServiceBase` (generated from `simulation.proto`).
 
-**Reset** - Reset the simulation environment
-```protobuf
-rpc Reset(ResetRequest) returns (ResetResponse);
-```
+| RPC | Description |
+|---|---|
+| `Reset(ResetRequest)` | Creates a new episode; returns initial observation |
+| `Step(StepRequest)` | Executes one action; returns (observation, reward, terminated, truncated, info) |
+| `Close(CloseRequest)` | Terminates the environment instance |
 
-**Step** - Execute a single step with an action
-```protobuf
-rpc Step(StepRequest) returns (StepResponse);
-```
+**Request/response bridging via MessageBroker:**  
+Each RPC publishes a `Command` on `IMessageBroker` and then awaits a correlated `Response` using a `TaskCompletionSource`. The correlation is achieved by matching `GymId + CorrelationId` on the response. Timeout is 30 seconds.
 
-**Close** - Close/cleanup the simulation
-```protobuf
-rpc Close(CloseRequest) returns (CloseResponse);
-```
+## Proto Files
+`Protos/simulation.proto` — defines the gym interface.  
+Shared with the Python service (`auxiliumlab-rl-service-baselines3/proto/simulation.proto`).
 
-## Current Implementation
-
-⚠️ **Important**: This is a **stub implementation**. All methods return dummy values:
-- `Reset()` returns a zero observation `[0, 0, 0, 0]`
-- `Step()` returns zeros with reward=0, terminated=false
-- `Close()` returns success=true
-
-**Real simulation logic will be integrated later.**
-
-## Testing
-
-### From Python
-
-```python
-from auxilium_rl.infra.external_env_adapter import GrpcExternalEnvAdapter
-
-adapter = GrpcExternalEnvAdapter("localhost:50051")
-observation = adapter.reset(seed=42)
-obs, reward, terminated, truncated, info = adapter.step(action=1)
-adapter.close()
-```
-
-### Using the Test Script
-
-```bash
-# From auxilium_rl_service_baselines3/ directory
-python test_grpc_communication.py
-```
-
-## Health Checks
-
-The server includes gRPC health checks:
-
-```bash
-# Using grpcurl (if installed)
-grpcurl -plaintext localhost:50051 grpc.health.v1.Health/Check
+Regenerate C# stubs:
+```powershell
+cd AuxiliumLab.AiSandbox
+dotnet build   # csproj includes <Protobuf> items that auto-generate stubs
 ```
 
 ## Configuration
-
-Edit [appsettings.json](appsettings.json) to change logging levels or other settings.
-
-To change the port, modify [Program.cs](Program.cs):
+`appsettings.json` controls logging and Kestrel port.  
+Port can be changed in `GrpcHost/Configuration/GrpcTrainingHost.cs`:
 ```csharp
-options.ListenLocalhost(50051, listenOptions => // Change port here
+options.ListenLocalhost(50062, o => o.Protocols = HttpProtocols.Http2);
+```
+
+## Integration with Startup
+`GrpcTrainingHost` (in `Startup`) builds a `WebApplication` with Kestrel configured for HTTP/2.  
+Core services are registered by `RegisterCoreServices()` in `Program.cs` and dedicated gRPC services are added via `AddGrpcHostServices()`.
+
+## Testing
+```powershell
+# From Python service directory with .venv active:
+python test_grpc_communication.py
+```
+
+Or using grpcurl:
+```bash
+grpcurl -plaintext localhost:50062 grpc.health.v1.Health/Check
 ```
 
 ## Project Structure
-
 ```
-AuxiliumLab.AiSandbox.GrpcHost/
+GrpcHost/
 ├── Protos/
-│   └── simulation.proto          # Service contract
+│   └── simulation.proto              Service contract (gym interface)
 ├── Services/
-│   └── SimulationService.cs      # Stub implementation
+│   └── SimulationService.cs          gRPC implementation, bridges to IMessageBroker
+├── Configuration/
+│   └── GrpcHostServiceCollectionExtensions.cs
 ├── Examples/
-│   └── PolicyTrainerClientExample.cs  # Example of calling Python
-├── Program.cs                     # Startup & configuration
-└── appsettings.json              # Settings
+│   └── PolicyTrainerClientExample.cs Example of calling Python from .NET
+├── Properties/
+│   └── launchSettings.json
+└── appsettings.json
 ```
 
 ## Next Steps
+- ✅ gRPC infrastructure is set up and connected to `IMessageBroker`.
+- ✅ `SimulationService` bridges Python gym calls to .NET training executors.
+- ⏭️ Wire real reward shaping from domain win/loss conditions.
+- ⏭️ Expand observation vector beyond basic `[x, y, enemies, turn]`.
 
-1. ✅ gRPC infrastructure is set up
-2. ✅ Stub implementation works
-3. ⏭️ Integrate real simulation logic from AuxiliumLab.AiSandbox.Domain
-4. ⏭️ Wire up actual game state to gRPC responses
 
 See [GRPC_SETUP.md](../GRPC_SETUP.md) for complete documentation.

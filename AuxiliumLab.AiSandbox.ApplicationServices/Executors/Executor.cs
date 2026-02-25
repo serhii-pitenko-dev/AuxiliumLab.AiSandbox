@@ -15,7 +15,6 @@ using AuxiliumLab.AiSandbox.Common.MessageBroker.Contracts.GlobalMessagesContrac
 using AuxiliumLab.AiSandbox.Domain.Agents.Entities;
 using AuxiliumLab.AiSandbox.Domain.Maps;
 using AuxiliumLab.AiSandbox.Domain.Playgrounds;
-using AuxiliumLab.AiSandbox.Domain.Statistics.Entities;
 using AuxiliumLab.AiSandbox.Infrastructure.Configuration.Preconditions;
 using AuxiliumLab.AiSandbox.Infrastructure.FileManager;
 using AuxiliumLab.AiSandbox.Infrastructure.MemoryManager;
@@ -64,8 +63,6 @@ public abstract class Executor : IExecutor
         IMemoryDataManager<StandardPlayground> sandboxRepository,
         IAiActions aiActions,
         IOptions<SandBoxConfiguration> configuration,
-        IMemoryDataManager<PlayGroundStatistics> statisticsMemoryRepository,
-        IFileDataManager<PlayGroundStatistics> statisticsFileRepository,
         IFileDataManager<StandardPlaygroundState> playgroundStateFileRepository,
         IMemoryDataManager<AgentStateForAIDecision> agentStateMemoryRepository,
         IMessageBroker messageBroker,
@@ -145,8 +142,6 @@ public abstract class Executor : IExecutor
         CancellationToken cancellationToken = new CancellationToken();
         try
         {
-           //await CreateRawLog($"Playground with id {_playground.Id} started.");
-
            await StartSimulationAsync(cancellationToken);
         }
         catch (Exception ex)

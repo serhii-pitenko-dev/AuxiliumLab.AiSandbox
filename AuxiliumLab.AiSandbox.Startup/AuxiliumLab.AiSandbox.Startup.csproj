@@ -38,7 +38,7 @@
     <ProjectReference Include="..\AuxiliumLab.AiSandbox.ConsolePresentation\AuxiliumLab.AiSandbox.ConsolePresentation.csproj" />
     <ProjectReference Include="..\AuxiliumLab.AiSandbox.GrpcHost\AuxiliumLab.AiSandbox.GrpcHost.csproj" />
     <ProjectReference Include="..\AuxiliumLab.AiSandbox.Infrastructure\AuxiliumLab.AiSandbox.Infrastructure.csproj" />
-    <ProjectReference Include="..\Statistics\AuxiliumLab.AiSandbox.Statistics.csproj" />
+    <ProjectReference Include="..\AuxiliumLab.Statistics\AuxiliumLab.AiSandbox.Statistics.csproj" />
     <ProjectReference Include="..\AuxiliumLab.AiSandbox.WebApi\AuxiliumLab.AiSandbox.WebApi.csproj" />
   </ItemGroup>
 

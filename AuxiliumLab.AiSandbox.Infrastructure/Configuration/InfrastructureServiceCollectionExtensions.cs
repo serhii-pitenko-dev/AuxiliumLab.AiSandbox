@@ -1,5 +1,4 @@
 using AuxiliumLab.AiSandbox.Domain.Playgrounds;
-using AuxiliumLab.AiSandbox.Domain.Statistics.Entities;
 using AuxiliumLab.AiSandbox.Infrastructure.Configuration.Preconditions;
 using AuxiliumLab.AiSandbox.Infrastructure.FileManager;
 using AuxiliumLab.AiSandbox.Infrastructure.MemoryManager;
@@ -17,14 +16,10 @@ public static class InfrastructureServiceCollectionExtensions
 
         // Changed from Map to Sandbox
         services.AddSingleton<IMemoryDataManager<StandardPlayground>, MemoryDataManager<StandardPlayground>>();
-        services.AddSingleton<IMemoryDataManager<PlayGroundStatistics>, MemoryDataManager<PlayGroundStatistics>>();
-        services.AddSingleton<IMemoryDataManager<AgentStatistics>, MemoryDataManager<AgentStatistics>>();
         services.AddSingleton<IMemoryDataManager<AgentStateForAIDecision>, MemoryDataManager<AgentStateForAIDecision>>();
 
         // Add File Data Managers
         services.AddSingleton<IFileDataManager<StandardPlayground>, FileDataManager<StandardPlayground>>();
-        services.AddSingleton<IFileDataManager<AgentStatistics>, FileDataManager<AgentStatistics>>();
-        services.AddSingleton<IFileDataManager<PlayGroundStatistics>, FileDataManager<PlayGroundStatistics>>();
         services.AddSingleton<IFileDataManager<AgentStateForAIDecision>, FileDataManager<AgentStateForAIDecision>>();
 
         return services;

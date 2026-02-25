@@ -11,12 +11,10 @@ using AuxiliumLab.AiSandbox.ApplicationServices.Saver.Persistence.Sandbox.Mapper
 using AuxiliumLab.AiSandbox.ApplicationServices.Saver.Persistence.Sandbox.States;
 using AuxiliumLab.AiSandbox.Common.MessageBroker;
 using AuxiliumLab.AiSandbox.Domain.Playgrounds;
-using AuxiliumLab.AiSandbox.Domain.Statistics.Entities;
 using AuxiliumLab.AiSandbox.Infrastructure.Configuration.Preconditions;
 using AuxiliumLab.AiSandbox.Infrastructure.FileManager;
 using AuxiliumLab.AiSandbox.Infrastructure.MemoryManager;
 using AuxiliumLab.AiSandbox.SharedBaseTypes.AiContract.Dto;
-using AuxiliumLab.AiSandbox.SharedBaseTypes.ValueObjects;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
@@ -63,8 +61,6 @@ public class TrainingRunner
         var messageBroker = _serviceProvider.GetRequiredService<IMessageBroker>();
         var agentStateRepo = _serviceProvider.GetRequiredService<IMemoryDataManager<AgentStateForAIDecision>>();
         var playgroundRepo = _serviceProvider.GetRequiredService<IMemoryDataManager<StandardPlayground>>();
-        var statisticsRepo = _serviceProvider.GetRequiredService<IMemoryDataManager<PlayGroundStatistics>>();
-        var statFileRepo = _serviceProvider.GetRequiredService<IFileDataManager<PlayGroundStatistics>>();
         var playgroundStateFileRepo = _serviceProvider.GetRequiredService<IFileDataManager<StandardPlaygroundState>>();
         var msgBrokerRpc = _serviceProvider.GetRequiredService<IBrokerRpcClient>();
         var mapper = _serviceProvider.GetRequiredService<IStandardPlaygroundMapper>();
@@ -94,8 +90,6 @@ public class TrainingRunner
                 playgroundRepo,
                 sb3,
                 sandboxConfig,
-                statisticsRepo,
-                statFileRepo,
                 playgroundStateFileRepo,
                 agentStateRepo,
                 messageBroker,

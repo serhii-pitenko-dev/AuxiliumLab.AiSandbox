@@ -30,7 +30,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		README.md = README.md
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AuxiliumLab.AiSandbox.Statistics", "Statistics\AuxiliumLab.AiSandbox.Statistics.csproj", "{2EF0AD32-298C-485D-ACF4-106A21913BE0}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AuxiliumLab.AiSandbox.Statistics", "AuxiliumLab.Statistics\AuxiliumLab.AiSandbox.Statistics.csproj", "{2EF0AD32-298C-485D-ACF4-106A21913BE0}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AuxiliumLab.AiSandbox.UnitTests", "AuxiliumLab.AiSandbox.UnitTests\AuxiliumLab.AiSandbox.UnitTests.csproj", "{B71143CF-A01C-4F7D-99FA-1CD1ADE39DCA}"
 EndProject

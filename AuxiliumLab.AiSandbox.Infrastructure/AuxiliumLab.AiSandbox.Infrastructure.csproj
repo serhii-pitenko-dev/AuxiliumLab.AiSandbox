@@ -15,7 +15,7 @@
   <ItemGroup>
     <ProjectReference Include="..\AuxiliumLab.AiSandbox.Common\AuxiliumLab.AiSandbox.Common.csproj" />
     <ProjectReference Include="..\AuxiliumLab.AiSandbox.Domain\AuxiliumLab.AiSandbox.Domain.csproj" />
-    <ProjectReference Include="..\Statistics\AuxiliumLab.AiSandbox.Statistics.csproj" />
+    <ProjectReference Include="..\AuxiliumLab.Statistics\AuxiliumLab.AiSandbox.Statistics.csproj" />
   </ItemGroup>
 
 </Project>

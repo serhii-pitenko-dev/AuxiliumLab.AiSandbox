@@ -8,7 +8,6 @@ using AuxiliumLab.AiSandbox.ApplicationServices.Saver.Persistence.Sandbox.States
 using AuxiliumLab.AiSandbox.Common.MessageBroker;
 using AuxiliumLab.AiSandbox.Common.MessageBroker.Contracts.CoreServicesContract.Events;
 using AuxiliumLab.AiSandbox.Domain.Playgrounds;
-using AuxiliumLab.AiSandbox.Domain.Statistics.Entities;
 using AuxiliumLab.AiSandbox.Infrastructure.Configuration.Preconditions;
 using AuxiliumLab.AiSandbox.Infrastructure.FileManager;
 using AuxiliumLab.AiSandbox.Infrastructure.MemoryManager;
@@ -25,8 +24,6 @@ public class ExecutorForPresentation : Executor, IExecutorForPresentation
         IMemoryDataManager<StandardPlayground> sandboxRepository,
         IAiActions aiActions,
         IOptions<SandBoxConfiguration> configuration,
-        IMemoryDataManager<PlayGroundStatistics> statisticsMemoryRepository,
-        IFileDataManager<PlayGroundStatistics> statisticsFileRepository,
         IFileDataManager<StandardPlaygroundState> playgroundStateFileRepository,
         IMemoryDataManager<AgentStateForAIDecision> agentStateMemoryRepository,
         IMessageBroker messageBroker,
@@ -37,7 +34,7 @@ public class ExecutorForPresentation : Executor, IExecutorForPresentation
         IFileDataManager<SandboxExecutionPerformance> sandboxExecutionPerformanceFileRepository,
         ITestPreconditionData testPreconditionData) :
         base(mapCommands, sandboxRepository, aiActions,
-             configuration, statisticsMemoryRepository, statisticsFileRepository,
+             configuration,
              playgroundStateFileRepository, agentStateMemoryRepository, messageBroker,
              brokerRpcClient, standardPlaygroundMapper, rawDataLogFileRepository,
              turnExecutionPerformanceFileRepository, sandboxExecutionPerformanceFileRepository,

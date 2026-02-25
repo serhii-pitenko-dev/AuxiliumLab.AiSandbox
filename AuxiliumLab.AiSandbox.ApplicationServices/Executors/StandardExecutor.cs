@@ -9,7 +9,6 @@ using AuxiliumLab.AiSandbox.Common.MessageBroker;
 using AuxiliumLab.AiSandbox.Common.MessageBroker.Contracts.GlobalMessagesContract.Events.Lost;
 using AuxiliumLab.AiSandbox.Common.MessageBroker.Contracts.GlobalMessagesContract.Events.Win;
 using AuxiliumLab.AiSandbox.Domain.Playgrounds;
-using AuxiliumLab.AiSandbox.Domain.Statistics.Entities;
 using AuxiliumLab.AiSandbox.Domain.Statistics.Result;
 using AuxiliumLab.AiSandbox.Infrastructure.Configuration.Preconditions;
 using AuxiliumLab.AiSandbox.Infrastructure.FileManager;
@@ -27,8 +26,6 @@ public class StandardExecutor : Executor, IStandardExecutor
         IMemoryDataManager<StandardPlayground> sandboxRepository,
         IAiActions aiActions,
         IOptions<SandBoxConfiguration> configuration,
-        IMemoryDataManager<PlayGroundStatistics> statisticsMemoryRepository,
-        IFileDataManager<PlayGroundStatistics> statisticsFileRepository,
         IFileDataManager<StandardPlaygroundState> playgroundStateFileRepository,
         IMemoryDataManager<AgentStateForAIDecision> agentStateMemoryRepository,
         IMessageBroker messageBroker,
@@ -39,8 +36,7 @@ public class StandardExecutor : Executor, IStandardExecutor
         IFileDataManager<SandboxExecutionPerformance> sandboxExecutionPerformanceFileRepository,
         ITestPreconditionData testPreconditionData) :
         base(mapCommands, sandboxRepository, aiActions,
-             configuration, statisticsMemoryRepository, statisticsFileRepository,
-             playgroundStateFileRepository, agentStateMemoryRepository, messageBroker,
+             configuration, playgroundStateFileRepository, agentStateMemoryRepository, messageBroker,
              brokerRpcClient, standardPlaygroundMapper, rawDataLogFileRepository,
              turnExecutionPerformanceFileRepository, sandboxExecutionPerformanceFileRepository,
              testPreconditionData)

@@ -7,17 +7,11 @@ using AuxiliumLab.AiSandbox.ApplicationServices.Saver.Persistence.Sandbox.Mapper
 using AuxiliumLab.AiSandbox.ApplicationServices.Saver.Persistence.Sandbox.States;
 using AuxiliumLab.AiSandbox.Common.MessageBroker;
 using AuxiliumLab.AiSandbox.Domain.Playgrounds;
-using AuxiliumLab.AiSandbox.Domain.Statistics.Entities;
 using AuxiliumLab.AiSandbox.Infrastructure.Configuration.Preconditions;
 using AuxiliumLab.AiSandbox.Infrastructure.FileManager;
 using AuxiliumLab.AiSandbox.Infrastructure.MemoryManager;
 using AuxiliumLab.AiSandbox.SharedBaseTypes.AiContract.Dto;
 using Microsoft.Extensions.Options;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace AuxiliumLab.AiSandbox.ApplicationServices.Executors;
 
@@ -27,8 +21,6 @@ public class ExecutorFactory : IExecutorFactory
     private readonly IMemoryDataManager<StandardPlayground> _sandboxRepository;
     private readonly IAiActions _aiActions;
     private readonly IOptions<SandBoxConfiguration> _configuration;
-    private readonly IMemoryDataManager<PlayGroundStatistics> _statisticsMemoryRepository;
-    private readonly IFileDataManager<PlayGroundStatistics> _statisticsFileRepository;
     private readonly IFileDataManager<StandardPlaygroundState> _playgroundStateFileRepository;
     private readonly IMemoryDataManager<AgentStateForAIDecision> _agentStateMemoryRepository;
     private readonly IMessageBroker _messageBroker;
@@ -43,8 +35,6 @@ public class ExecutorFactory : IExecutorFactory
         IMemoryDataManager<StandardPlayground> sandboxRepository,
         IAiActions aiActions,
         IOptions<SandBoxConfiguration> configuration,
-        IMemoryDataManager<PlayGroundStatistics> statisticsMemoryRepository,
-        IFileDataManager<PlayGroundStatistics> statisticsFileRepository,
         IFileDataManager<StandardPlaygroundState> playgroundStateFileRepository,
         IMemoryDataManager<AgentStateForAIDecision> agentStateMemoryRepository,
         IMessageBroker messageBroker,
@@ -59,8 +49,6 @@ public class ExecutorFactory : IExecutorFactory
         _sandboxRepository = sandboxRepository;
         _aiActions = aiActions;
         _configuration = configuration;
-        _statisticsMemoryRepository = statisticsMemoryRepository;
-        _statisticsFileRepository = statisticsFileRepository;
         _playgroundStateFileRepository = playgroundStateFileRepository;
         _agentStateMemoryRepository = agentStateMemoryRepository;
         _messageBroker = messageBroker;
@@ -79,8 +67,6 @@ public class ExecutorFactory : IExecutorFactory
             _sandboxRepository,
             _aiActions,
             _configuration,
-            _statisticsMemoryRepository,
-            _statisticsFileRepository,
             _playgroundStateFileRepository,
             _agentStateMemoryRepository,
             _messageBroker,
@@ -115,8 +101,6 @@ public class ExecutorFactory : IExecutorFactory
             _sandboxRepository, // shared: CreatePlaygroundCommandHandler writes here; unique GUIDs prevent collisions
             aiActions,          // per-sim: subscribes to its own broker only
             _configuration,
-            _statisticsMemoryRepository,
-            _statisticsFileRepository,
             _playgroundStateFileRepository,
             agentStore,         // per-sim: matches the broker/aiActions pair
             broker,             // per-sim: no shared publish lock

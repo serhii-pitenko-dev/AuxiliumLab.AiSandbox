@@ -94,17 +94,33 @@ public class ExecutorFactory : IExecutorFactory
 
     public IStandardExecutor CreateStandardExecutor()
     {
+        // Create fully isolated instances per simulation so that concurrent
+        // simulations running on different thread-pool threads share NO mutable
+        // state in the message/AI pipeline.  This eliminates:
+        //   1. The global lock in MessageBroker.Publish (all N handlers under one lock)
+        //   2. Subscriber proliferation: each Initialize() previously accumulated
+        //      another handler on the shared broker, causing N×wasted CPU work per
+        //      decision (N handlers respond but only 1 result is consumed)
+        //
+        // Note: IMemoryDataManager<StandardPlayground> stays shared because
+        //   CreatePlaygroundCommandHandler saves to that singleton, and each
+        //   simulation uses a unique sandboxId GUID so there are no key collisions.
+        var broker     = new AiSandBox.Common.MessageBroker.MessageBroker();
+        var rpcClient  = new BrokerRpcClient(broker);
+        var agentStore = new MemoryDataManager<AgentStateForAIDecision>(); // per-sim: no GUID collisions and keeps broker/AI pair consistent
+        var aiActions  = new RandomActions(broker, agentStore);
+
         return new StandardExecutor(
             _mapCommands,
-            _sandboxRepository,
-            _aiActions,
+            _sandboxRepository, // shared: CreatePlaygroundCommandHandler writes here; unique GUIDs prevent collisions
+            aiActions,          // per-sim: subscribes to its own broker only
             _configuration,
             _statisticsMemoryRepository,
             _statisticsFileRepository,
             _playgroundStateFileRepository,
-            _agentStateMemoryRepository,
-            _messageBroker,
-            _brokerRpcClient,
+            agentStore,         // per-sim: matches the broker/aiActions pair
+            broker,             // per-sim: no shared publish lock
+            rpcClient,          // per-sim: subscribes to its own broker
             _standardPlaygroundMapper,
             _rawDataLogFileRepository,
             _turnExecutionPerformanceFileRepository,

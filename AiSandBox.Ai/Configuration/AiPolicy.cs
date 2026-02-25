@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace AiSandBox.Ai.Configuration;
+﻿namespace AiSandBox.Ai.Configuration;
 
 /// <summary>
 /// Defines the type of neural network policy used by the RL agent.

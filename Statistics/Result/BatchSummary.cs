@@ -1,4 +1,4 @@
-namespace AiSandBox.Domain.Statistics.Result;
+namespace AuxiliumLab.AiSandbox.Domain.Statistics.Result;
 
 /// <summary>
 /// Contains aggregated summary information for a single execution phase within a mass run.

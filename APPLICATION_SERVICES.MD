@@ -1,8 +1,8 @@
 # Execution Logic
-- Stored in the folder (AiSandBox.ApplicationServices/Runner), Executor classes.
-- Use [commands](AiSandBox.ApplicationServices/Commands) for creating Playground 
+- Stored in the folder (AuxiliumLab.AiSandbox.ApplicationServices/Runner), Executor classes.
+- Use [commands](AuxiliumLab.AiSandbox.ApplicationServices/Commands) for creating Playground 
 - Communication with Ai - trough IMessageBroker and IBrokerRpcClient. IBrokerRpcClient is used to waite response, IMessageBroker is "fire and forget".
-- Data is getting directly from memory or file system using AiSandBox.Infrastructure.
+- Data is getting directly from memory or file system using AuxiliumLab.AiSandbox.Infrastructure.
 
 ## Main steps
 1. Creating playground using command and save it to memory

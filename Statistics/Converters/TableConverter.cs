@@ -1,8 +1,8 @@
-using AiSandBox.Domain.Statistics.Result;
-using AiSandBox.Statistics.Preconditions;
+using AuxiliumLab.AiSandbox.Domain.Statistics.Result;
+using AuxiliumLab.AiSandbox.Statistics.Preconditions;
 using System.Text;
 
-namespace AiSandBox.Statistics.Converters;
+namespace AuxiliumLab.AiSandbox.Statistics.Converters;
 
 /// <summary>
 /// Converts simulation precondition and result objects to CSV-formatted strings

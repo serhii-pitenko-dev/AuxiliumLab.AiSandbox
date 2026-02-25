@@ -1,7 +1,7 @@
-using AiSandBox.Common.MessageBroker.Contracts.GlobalMessagesContract.Events.Lost;
-using AiSandBox.Common.MessageBroker.Contracts.GlobalMessagesContract.Events.Win;
+using AuxiliumLab.AiSandbox.Common.MessageBroker.Contracts.GlobalMessagesContract.Events.Lost;
+using AuxiliumLab.AiSandbox.Common.MessageBroker.Contracts.GlobalMessagesContract.Events.Win;
 
-namespace AiSandBox.Domain.Statistics.Result;
+namespace AuxiliumLab.AiSandbox.Domain.Statistics.Result;
 
 /// <summary>
 /// Contains information about the result of a single sandbox run within a batch.

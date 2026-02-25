@@ -1,0 +1,1 @@
+dotnet run --project AuxiliumLab.AiSandbox/AuxiliumLab.AiSandbox.Startup/AuxiliumLab.AiSandbox.Startup.csproj --configuration Release

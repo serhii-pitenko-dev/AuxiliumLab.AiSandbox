@@ -1,4 +1,4 @@
-﻿namespace AiSandBox.Domain.Statistics.Entities;
+namespace AuxiliumLab.AiSandbox.Domain.Statistics.Entities;
 
 public class PlayGroundStatistics
 {

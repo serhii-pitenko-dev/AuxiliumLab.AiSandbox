@@ -1,4 +1,4 @@
-namespace AiSandBox.Statistics.Preconditions;
+namespace AuxiliumLab.AiSandbox.Statistics.Preconditions;
 
 /// <summary>
 /// Mirrors the <c>IncrementalProperties</c> sub-block of <c>StartupSettings</c>.

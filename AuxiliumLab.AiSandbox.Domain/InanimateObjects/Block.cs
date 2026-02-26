@@ -26,4 +26,13 @@ public class Block: SandboxMapBaseObject
     { 
         Transparent = false;
     }
+
+    /// <summary>
+    /// Protected constructor for derived block types (e.g. <see cref="BorderBlock"/>)
+    /// that need to report a different <see cref="ObjectType"/> to the base class.
+    /// </summary>
+    protected Block(ObjectType objectType, Cell? cell, Guid id) : base(objectType, cell, id)
+    {
+        Transparent = false;
+    }
 }

@@ -45,7 +45,7 @@ event Action<Guid>? ReadyForRendering;
 | `ConsoleSize.Width` | `int` | Console window width in characters |
 | `ConsoleSize.Height` | `int` | Console window height in characters |
 | `ColorScheme.GlobalBackGroundColor` | `string` | ANSI background colour |
-| `ColorScheme.*` | per-object | Colour for Hero, Enemy, Block, Exit, Empty cells |
+| `ColorScheme.*` | per-object | Colour for Hero, Enemy, Block, BorderBlock, Exit, Empty cells |
 | `ActionTimeout` | `int` (ms) | Delay between rendered actions (controls animation speed) |
 
 Settings are loaded from `AuxiliumLab.AiSandbox.ConsolePresentation/Settings.json` and injected as `IOptions<ConsoleSettings>`.
@@ -69,6 +69,7 @@ X0Y4 → X0Y0    X1Y4 → X1Y0    X2Y4 → X2Y0
 Each `ObjectType` maps to a configurable character + colour:
 - `Empty` → space / background colour
 - `Block` → `█` / wall colour
+- `BorderBlock` → `█` / border block colour (distinct from interior blocks; set via `ColorScheme.BorderBlockColor`)
 - `Hero` → `H` / hero colour
 - `Enemy` → `E` / enemy colour
 - `Exit` → `X` / exit colour

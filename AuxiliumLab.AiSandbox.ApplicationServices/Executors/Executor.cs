@@ -336,8 +336,9 @@ public abstract class Executor : IExecutor
             return (SandboxStatus.InProgress, true);
         }
 
-        // Check for agent if target cell with block
-        if ((agent.Type is ObjectType.Enemy or ObjectType.Hero) && moveToCell.Object.Type == ObjectType.Block)
+        // Check for agent if target cell with block (regular or border)
+        if ((agent.Type is ObjectType.Enemy or ObjectType.Hero) &&
+            (moveToCell.Object.Type == ObjectType.Block || moveToCell.Object.Type == ObjectType.BorderBlock))
         {
             return (SandboxStatus.InProgress, false);
         }

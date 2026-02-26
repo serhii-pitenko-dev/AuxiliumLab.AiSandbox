@@ -281,6 +281,7 @@ public class Sb3Actions : IAiActions
         //    2.0  →  ObjectType.Enemy
         //    3.0  →  ObjectType.Block
         //    4.0  →  ObjectType.Exit
+        //    5.0  →  ObjectType.BorderBlock  (perimeter wall — treated as a wall by the agent)
         // VisibleCells is already filtered by the domain (VisibilityService) —
         // no re-filtering needed here.
         for (int i = 5; i < observationSize; i++) obs[i] = -1f;

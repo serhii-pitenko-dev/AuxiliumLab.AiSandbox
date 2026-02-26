@@ -40,6 +40,12 @@ public class PlaygroundBuilder(
         _playgroundId = Playground.Id;
         _enemyOrderCounter = 1; // Reset counter when creating new playground
 
+        // Surround the playable area with border blocks so agents can never step
+        // off the edge of the map. Border blocks are opaque (block LOS) and
+        // impassable, just like regular blocks, but carry their own ObjectType
+        // so the renderer can colour them distinctly.
+        PlaceBorderBlocks();
+
         return this;
     }
 
@@ -75,22 +81,22 @@ public class PlaygroundBuilder(
     {
         Test++;
         var random = new Random();
-        var occupiedCells = new HashSet<(int x, int y)>();
 
-        while (Playground.Blocks.Count < blocksCount)
+        // Pre-seed with all coordinates that are already occupied (includes border blocks
+        // placed by SetMap) so that WouldCreateClosedArea sees the full true state of the
+        // map and does not erroneously route through border cells.
+        var occupiedCells = new HashSet<(int x, int y)>(
+            Playground.Blocks.Select(b => (b.Coordinates.X, b.Coordinates.Y)));
+
+        int placedBlocks = 0;
+        while (placedBlocks < blocksCount)
         {
-            int x = random.Next(0, Playground.MapWidth);
-            int y = random.Next(0, Playground.MapHeight);
+            // Only place interior blocks — skip the entire border perimeter.
+            int x = random.Next(1, Playground.MapWidth - 1);
+            int y = random.Next(1, Playground.MapHeight - 1);
 
             // Skip if cell is already occupied
             if (occupiedCells.Contains((x, y)))
-                continue;
-
-            // Don't place blocks at corners to prevent closed areas
-            if (x == 0 && y == 0 ||
-                x == 0 && y == Playground.MapHeight - 1 ||
-                x == Playground.MapWidth - 1 && y == 0 ||
-                x == Playground.MapWidth - 1 && y == Playground.MapHeight - 1)
                 continue;
 
             // Check if placing a block here would create a closed area
@@ -99,6 +105,7 @@ public class PlaygroundBuilder(
                 var block = new Block(Guid.NewGuid());
                 Playground.AddBlock(block, new Coordinates(x, y));
                 occupiedCells.Add((x, y));
+                placedBlocks++;
             }
         }
 
@@ -114,12 +121,14 @@ public class PlaygroundBuilder(
     public IPlaygroundBuilder PlaceHero(InitialAgentCharacters heroCharacters)
     {
         var random = new Random();
-        int x = 0; // First column (leftmost X value)
+        // x=1 is the first interior column — x=0 is the border wall.
+        int x = 1;
         int y;
 
         do
         {
-            y = random.Next(0, Playground.MapHeight);
+            // Interior rows only (1 .. Height-2); y=0 and y=Height-1 are border walls.
+            y = random.Next(1, Playground.MapHeight - 1);
         } while (IsCellOccupied(x, y));
 
         Playground.PlaceHero(HeroFactory.CreateHero(heroCharacters), new Coordinates(x, y));
@@ -136,12 +145,14 @@ public class PlaygroundBuilder(
     public IPlaygroundBuilder PlaceExit()
     {
         var random = new Random();
-        int x = Playground.MapWidth - 1; // Last column (rightmost X value)
+        // x=Width-2 is the last interior column — x=Width-1 is the border wall.
+        int x = Playground.MapWidth - 2;
         int y;
 
         do
         {
-            y = random.Next(0, Playground.MapHeight);
+            // Interior rows only (1 .. Height-2); y=0 and y=Height-1 are border walls.
+            y = random.Next(1, Playground.MapHeight - 1);
         } while (IsCellOccupied(x, y));
 
         Playground.PlaceExit(new Exit(Guid.NewGuid()), new Coordinates(x, y));
@@ -166,8 +177,9 @@ public class PlaygroundBuilder(
 
             do
             {
-                x = random.Next(0, Playground.MapWidth);
-                y = random.Next(0, Playground.MapHeight);
+                // Interior cells only — skip border perimeter.
+                x = random.Next(1, Playground.MapWidth - 1);
+                y = random.Next(1, Playground.MapHeight - 1);
                 validPosition = !IsCellOccupied(x, y) && IsDistanceFromHeroValid(x, y);
             } while (!validPosition);
 
@@ -275,22 +287,26 @@ public class PlaygroundBuilder(
 
     private bool WouldCreateClosedArea(int x, int y, HashSet<(int x, int y)> occupiedCells)
     {
-        // Temporarily add the new block
+        // Temporarily add the new block to the occupied set.
+        // occupiedCells already includes the border perimeter so the BFS cannot
+        // accidentally route through border cells.
         var tempOccupied = new HashSet<(int x, int y)>(occupiedCells)
         {
             (x, y)
         };
 
-        // Check if there's still a path from bottom-left to top-right (Cartesian coordinates)
+        // Check if there is still a path from the interior top-left corner to the
+        // interior bottom-right corner (Cartesian coordinates, both stay within
+        // the playable 1..Width-2 × 1..Height-2 region).
         var visited = new HashSet<(int x, int y)>();
         var queue = new Queue<(int x, int y)>();
-        queue.Enqueue((0, Playground.MapHeight - 1)); // Start from top-left in Cartesian (0, Height-1)
+        queue.Enqueue((1, Playground.MapHeight - 2)); // Interior top-left
 
         while (queue.Count > 0)
         {
             var (curX, curY) = queue.Dequeue();
-            if (curX == Playground.MapWidth - 1 && curY == 0) // End at bottom-right in Cartesian (Width-1, 0)
-                return false; // Path exists, no closed area
+            if (curX == Playground.MapWidth - 2 && curY == 1) // Interior bottom-right
+                return false; // Path exists — no closed area
 
             var neighbors = new[]
             {
@@ -302,8 +318,8 @@ public class PlaygroundBuilder(
 
             foreach (var (nextX, nextY) in neighbors)
             {
-                if (nextX >= 0 && nextX < Playground.MapWidth &&
-                    nextY >= 0 && nextY < Playground.MapHeight &&
+                if (nextX >= 1 && nextX < Playground.MapWidth - 1 &&
+                    nextY >= 1 && nextY < Playground.MapHeight - 1 &&
                     !tempOccupied.Contains((nextX, nextY)) &&
                     !visited.Contains((nextX, nextY)))
                 {
@@ -313,6 +329,33 @@ public class PlaygroundBuilder(
             }
         }
 
-        return true; // No path found, would create closed area
+        return true; // No path found — would create a closed area
+    }
+
+    /// <summary>
+    /// Surrounds the playable area with <see cref="BorderBlock"/> instances.
+    /// Called once by <see cref="SetMap"/> immediately after the playground is
+    /// created. The border covers the full bottom row (y=0), full top row
+    /// (y=Height-1), full left column (x=0) and full right column (x=Width-1).
+    /// </summary>
+    private void PlaceBorderBlocks()
+    {
+        int w = Playground.MapWidth;
+        int h = Playground.MapHeight;
+
+        // Bottom row (y=0) and top row (y=h-1) — full width including corners.
+        for (int bx = 0; bx < w; bx++)
+        {
+            Playground.AddBlock(new BorderBlock(Guid.NewGuid()), new Coordinates(bx, 0));
+            Playground.AddBlock(new BorderBlock(Guid.NewGuid()), new Coordinates(bx, h - 1));
+        }
+
+        // Left column (x=0) and right column (x=w-1) — interior rows only
+        // (corners already covered above).
+        for (int by = 1; by < h - 1; by++)
+        {
+            Playground.AddBlock(new BorderBlock(Guid.NewGuid()), new Coordinates(0, by));
+            Playground.AddBlock(new BorderBlock(Guid.NewGuid()), new Coordinates(w - 1, by));
+        }
     }
 }

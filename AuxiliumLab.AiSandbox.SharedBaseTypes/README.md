@@ -13,7 +13,7 @@ Holds all shared value types, enumerations, and message-type base classes. Becau
 | Type | Kind | Description |
 |---|---|---|
 | `Coordinates` | `record struct` | `(int X, int Y)` grid position. `(0,0)` = bottom-left |
-| `ObjectType` | `enum` | `Empty, Block, Hero, Enemy, Exit` |
+| `ObjectType` | `enum` | `Empty, Block, Hero, Enemy, Exit, BorderBlock` |
 | `AgentAction` | `enum` | `Move, Run` |
 | `SandboxStatus` | `enum` | `InProgress, HeroWon, HeroLost, TurnLimitReached` |
 | `MapType` | `enum` | Random vs. file-loaded map generation strategy |

@@ -377,7 +377,10 @@ public class StandardPlaygroundMapperTest
         Assert.AreEqual(originalPlayground.MapHeight, reconstructedPlayground.MapHeight);
 
         // Assert - Collections count
-        Assert.AreEqual(originalPlayground.Blocks.Count, reconstructedPlayground.Blocks.Count);
+        // Border blocks are re-created by SetMap and are not persisted in state,
+        // so exclude them when comparing against the original (which was built
+        // directly via StandardPlayground, without any border blocks).
+        Assert.AreEqual(originalPlayground.Blocks.Count, reconstructedPlayground.Blocks.Count(b => b is not BorderBlock));
         Assert.AreEqual(originalPlayground.Enemies.Count, reconstructedPlayground.Enemies.Count);
         Assert.IsNotNull(reconstructedPlayground.Hero);
         Assert.IsNotNull(reconstructedPlayground.Exit);
@@ -442,21 +445,21 @@ public class StandardPlaygroundMapperTest
     {
         var playground = CreateBasicPlayground();
 
-        // Add hero
-        var heroCell = playground.GetCell(0, 0);
+        // Add hero — place at interior cell (x=1 is first interior column after border)
+        var heroCell = playground.GetCell(1, 1);
         var heroCharacters = new InitialAgentCharacters(5, 3, 100, [], [], [], false, 0);
         var hero = new Hero(heroCell, heroCharacters, Guid.NewGuid());
         playground.PlaceHero(hero, hero.Coordinates);
 
-        // Add exit
-        var exitCell = playground.GetCell(9, 7);
+        // Add exit — place at last interior column (x=8 for a 10-wide map)
+        var exitCell = playground.GetCell(8, 6);
         var exit = new Exit(exitCell, Guid.NewGuid());
         playground.PlaceExit(exit, exit.Coordinates);
 
-        // Add blocks
+        // Add blocks at interior positions (start at x=2 to avoid hero at x=1)
         for (int i = 0; i < 2; i++)
         {
-            var cell = playground.GetCell(i + 1, 1);
+            var cell = playground.GetCell(i + 2, 1);
             var block = new Block(cell, Guid.NewGuid());
             playground.AddBlock(block, block.Coordinates);
         }

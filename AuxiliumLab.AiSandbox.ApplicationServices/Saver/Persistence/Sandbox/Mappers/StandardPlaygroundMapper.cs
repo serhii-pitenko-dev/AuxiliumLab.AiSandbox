@@ -29,7 +29,9 @@ public class StandardPlaygroundMapper: IStandardPlaygroundMapper
             Id = playground.Id,
             Hero = playground.Hero != null ? MapHeroToState(playground.Hero) : null,
             Exit = playground.Exit != null ? MapExitToState(playground.Exit) : null,
-            Blocks = playground.Blocks.Select(MapBlockToState).ToList(),
+            Blocks = playground.Blocks
+                .Where(b => b is not BorderBlock) // Border blocks are re-created by SetMap on every load — never persist them.
+                .Select(MapBlockToState).ToList(),
             Enemies = playground.Enemies.Select(MapEnemyToState).ToList(),
             Map = MapMapToState(playground)
         };

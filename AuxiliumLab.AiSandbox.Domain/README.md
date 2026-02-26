@@ -27,6 +27,7 @@ Cell                    // A single grid position; holds exactly one SandboxMapB
 |---|---|---|
 | `EmptyCell` | `true` | Placeholder for an unoccupied cell |
 | `Block` | `false` | Solid obstacle; blocks movement and line-of-sight |
+| `BorderBlock` | `false` | Impassable perimeter wall placed automatically on every map edge by `PlaygroundBuilder.SetMap()`. Inherits `Block`; carries its own `ObjectType.BorderBlock` so the renderer can colour it distinctly. Never persisted in saved state — re-created on every load. |
 | `Exit` | `true` | Goal tile — hero reaching it triggers a win |
 
 ### Agents
@@ -95,7 +96,7 @@ Domain/
 │   ├── Factories/          HeroFactory, EnemyFactory
 │   └── Services/Vision/    IVisibilityService, VisibilityService
 ├── Configuration/          DomainServiceCollectionExtensions (DI registration)
-├── InanimateObjects/       Block, EmptyCell, Exit
+├── InanimateObjects/       Block, BorderBlock, EmptyCell, Exit
 ├── Maps/                   Cell, MapSquareCells
 ├── Playgrounds/
 │   ├── Builders/           PlaygroundBuilder

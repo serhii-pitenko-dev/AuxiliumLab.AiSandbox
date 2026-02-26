@@ -387,6 +387,7 @@ public class ConsoleRunner : IConsoleRunner
         {
             { ObjectType.Empty, $"[#000000 on {_consoleColorScheme.MapBackGroundColor}]·[/]" },
             { ObjectType.Block, $"[{_consoleColorScheme.BlockColor} on {_consoleColorScheme.MapBackGroundColor}]█[/]" },
+            { ObjectType.BorderBlock, $"[{_consoleColorScheme.BorderBlockColor} on {_consoleColorScheme.MapBackGroundColor}]█[/]" },
             { ObjectType.Hero, $"[{_consoleColorScheme.HeroColor} on {_consoleColorScheme.MapBackGroundColor}]█[/]" },
             { ObjectType.Enemy, $"[{_consoleColorScheme.EnemyColor} on {_consoleColorScheme.MapBackGroundColor}]X[/]" },
             { ObjectType.Exit, $"[Black on Green]E[/]" }

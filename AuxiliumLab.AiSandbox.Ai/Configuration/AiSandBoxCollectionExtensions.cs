@@ -11,13 +11,12 @@ public static class AiSandboxCollectionExtensions
     {
         services.AddSingleton<Sb3AlgorithmTypeProvider>();
 
-        if (executionMode != ExecutionMode.Training)
-        {
-            // RandomActions is the default IAiActions for all non-training modes
-            services.AddScoped<IAiActions, RandomActions>();
-        }
-        // In training mode, Sb3Actions instances are created manually by RunTraining
-        // (one per executor/gym). IAiActions is NOT resolved from DI for training.
+        // RandomActions is the default IAiActions for all non-training modes.
+        // In Training mode, Sb3Actions instances are created manually by TrainingRunner
+        // (one per gym), so IAiActions is never resolved from DI during training.
+        // We still register RandomActions here to satisfy ExecutorFactory's constructor
+        // dependency — ExecutorFactory is always registered but never invoked in training.
+        services.AddScoped<IAiActions, RandomActions>();
 
         return services;
     }

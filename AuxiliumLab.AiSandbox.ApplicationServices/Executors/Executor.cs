@@ -284,7 +284,7 @@ public abstract class Executor : IExecutor
             case AgentDecisionMoveResponse moveEvent when moveEvent.IsSuccess && moveEvent.From != moveEvent.To:
                 // Apply movement
                 bool isSuccess;
-                var result = CheckGameStatusAndMovingPossibility(agent, _playground.GetCell(moveEvent.To));
+                var result = CheckGameStatusAndMovingPossibility(agent, moveEvent.To);
                 if (result.MovePossibility == true && result.GameStatus == SandboxStatus.InProgress)
                 {
                     isSuccess = true;
@@ -319,25 +319,31 @@ public abstract class Executor : IExecutor
         }
     }
 
-    private (SandboxStatus GameStatus, bool MovePossibility) CheckGameStatusAndMovingPossibility(Agent agent, Cell moveTo)
+    private (SandboxStatus GameStatus, bool MovePossibility) CheckGameStatusAndMovingPossibility(Agent agent, Coordinates moveTo)
     {
         if (agent.Stamina == 0)
             return (SandboxStatus.InProgress, false);
 
+        // Out-of-bounds coordinates (e.g. Sb3Actions moving hero off map edge) are treated as a wall.
+        if (!_playground.IsInBounds(moveTo))
+            return (SandboxStatus.InProgress, false);
+
+        var moveToCell = _playground.GetCell(moveTo);
+
         // Check for agent if target cell is empty
-        if ((agent.Type is ObjectType.Enemy or ObjectType.Hero) && moveTo.Object.Type == ObjectType.Empty)
+        if ((agent.Type is ObjectType.Enemy or ObjectType.Hero) && moveToCell.Object.Type == ObjectType.Empty)
         {
             return (SandboxStatus.InProgress, true);
         }
 
         // Check for agent if target cell with block
-        if ((agent.Type is ObjectType.Enemy or ObjectType.Hero) && moveTo.Object.Type == ObjectType.Block)
+        if ((agent.Type is ObjectType.Enemy or ObjectType.Hero) && moveToCell.Object.Type == ObjectType.Block)
         {
             return (SandboxStatus.InProgress, false);
         }
 
         // Check for enemy is target cell with Hero
-        if (agent.Type is ObjectType.Enemy && moveTo.Object.Type == ObjectType.Hero)
+        if (agent.Type is ObjectType.Enemy && moveToCell.Object.Type == ObjectType.Hero)
         {
             _messageBroker.Publish(new HeroLostEvent(Guid.NewGuid(), _playground.Id, LostReason.HeroCatched));
             sandboxStatus = SandboxStatus.HeroLost;
@@ -346,13 +352,13 @@ public abstract class Executor : IExecutor
         }
 
         // Check for Hero is target cell with Exit
-        if (agent.Type is ObjectType.Enemy && moveTo.Object.Type == ObjectType.Exit)
+        if (agent.Type is ObjectType.Enemy && moveToCell.Object.Type == ObjectType.Exit)
         {
             return (SandboxStatus.InProgress, false);
         }
 
         // Check for Hero is target cell with Enemy
-        if (agent.Type == ObjectType.Hero && moveTo.Object.Type == ObjectType.Enemy)
+        if (agent.Type == ObjectType.Hero && moveToCell.Object.Type == ObjectType.Enemy)
         {
             _messageBroker.Publish(new HeroLostEvent(Guid.NewGuid(), _playground.Id, LostReason.HeroCatched));
             sandboxStatus = SandboxStatus.HeroLost;
@@ -361,7 +367,7 @@ public abstract class Executor : IExecutor
         }
 
         // Check for Hero is target cell with Exit
-        if (agent.Type == ObjectType.Hero && moveTo.Object.Type == ObjectType.Exit)
+        if (agent.Type == ObjectType.Hero && moveToCell.Object.Type == ObjectType.Exit)
         {
             _messageBroker.Publish(new HeroWonEvent(Guid.NewGuid(), _playground.Id, WinReason.ExitReached));
             sandboxStatus = SandboxStatus.HeroWon;

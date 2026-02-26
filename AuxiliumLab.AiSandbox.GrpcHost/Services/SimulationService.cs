@@ -25,6 +25,7 @@ public class SimulationService : Protos.SimulationService.SimulationServiceBase
     {
         Guid gymId = ParseGymId(request.GymId);
         _logger.LogInformation("Reset called for gym {GymId}, seed {Seed}", gymId, request.Seed);
+        Console.WriteLine($"[SimulationService] Reset request for gym_id={gymId}");
 
         var commandId = Guid.NewGuid();
         var tcs = new TaskCompletionSource<SimulationResetResponse>(
@@ -42,9 +43,10 @@ public class SimulationService : Protos.SimulationService.SimulationServiceBase
         _messageBroker.Subscribe(handler);
 
         _messageBroker.Publish(new RequestSimulationResetCommand(commandId, gymId, request.Seed));
+        Console.WriteLine($"[SimulationService] Published RequestSimulationResetCommand for gym_id={gymId}");
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken);
-        cts.CancelAfter(TimeSpan.FromSeconds(30));
+        cts.CancelAfter(TimeSpan.FromSeconds(120));  // 120s: must exceed Python's 60s Reset timeout
         cts.Token.Register(() => tcs.TrySetCanceled());
 
         var result = await tcs.Task.ConfigureAwait(false);
@@ -80,7 +82,7 @@ public class SimulationService : Protos.SimulationService.SimulationServiceBase
         _messageBroker.Publish(new RequestSimulationStepCommand(commandId, gymId, request.Action));
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken);
-        cts.CancelAfter(TimeSpan.FromSeconds(30));
+        cts.CancelAfter(TimeSpan.FromSeconds(60));  // 60s: must exceed Python's 30s Step timeout
         cts.Token.Register(() => tcs.TrySetCanceled());
 
         var result = await tcs.Task.ConfigureAwait(false);

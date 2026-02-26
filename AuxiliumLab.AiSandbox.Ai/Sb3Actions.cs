@@ -71,14 +71,7 @@ public class Sb3Actions : IAiActions
         _stepPenalty = stepPenalty;
         _winReward = winReward;
         _lossReward = lossReward;
-    }
 
-    /// <summary>Called by RunTraining to restart simulation episodes.</summary>
-    public void SetEpisodeCallback(Func<Task> callback) => _episodeCallback = callback;
-
-    // ── Initialize ────────────────────────────────────────────────────────────
-    public void Initialize()
-    {
         _messageBroker.Subscribe<GameStartedEvent>(OnGameStarted);
         _messageBroker.Subscribe<RequestAgentDecisionMakeCommand>(OnDecisionRequest);
         _messageBroker.Subscribe<HeroWonEvent>(OnHeroWon);
@@ -88,21 +81,38 @@ public class Sb3Actions : IAiActions
         _messageBroker.Subscribe<RequestSimulationCloseCommand>(OnSimulationClose);
     }
 
+    /// <summary>Called by RunTraining to restart simulation episodes.</summary>
+    public void SetEpisodeCallback(Func<Task> callback) => _episodeCallback = callback;
+
+    // ── Initialize ────────────────────────────────────────────────────────────
+    // IAiActions.Initialize() is an executor lifecycle hook called at the start
+    // of every episode via Executor.StartSimulationPreparationsAsync().
+    //
+    // For RandomActions it is meaningful: RandomActions is recreated per episode
+    // by ExecutorFactory, so it uses Initialize() to set up its broker subscriptions
+    // for that specific episode's playground.
+    //
+    // For Sb3Actions it is a no-op: Sb3Actions is long-lived (one instance per gym
+    // for the entire training session) and subscribes to the broker once in its
+    // constructor. The executor still calls Initialize() on every episode, but
+    // Sb3Actions simply ignores it.
+    public void Initialize() { }
+
     // ── AiContract handlers ───────────────────────────────────────────────────
 
     private void OnGameStarted(GameStartedEvent evt)
     {
-        // Capture playground id from the first game that targets our gym
-        if (_playgroundId == Guid.Empty)
-            _playgroundId = evt.PlaygroundId;
-
-        if (evt.PlaygroundId == _playgroundId)
-            _messageBroker.Publish(new AiReadyToActionsResponse(Guid.NewGuid(), evt.PlaygroundId, evt.Id));
+        // With a per-gym isolated broker, every GameStartedEvent on this broker
+        // was fired by this gym's own executor — no filtering needed.
+        _playgroundId = evt.PlaygroundId;
+        _messageBroker.Publish(new AiReadyToActionsResponse(Guid.NewGuid(), evt.PlaygroundId, evt.Id));
     }
 
     private void OnDecisionRequest(RequestAgentDecisionMakeCommand cmd)
     {
         if (cmd.PlaygroundId != _playgroundId) return;
+
+        Console.WriteLine($"[Sb3Actions:{GymId:N}] OnDecisionRequest playground={cmd.PlaygroundId:N} waitingForReset={_isWaitingForResetObservation}");
 
         var agent = _agentStateMemoryRepository.LoadObject(cmd.AgentId);
         if (agent is null) return;
@@ -150,7 +160,7 @@ public class Sb3Actions : IAiActions
     {
         if (evt.PlaygroundId != _playgroundId) return;
         CompleteStep(_winReward, terminated: true);
-        _playgroundId = Guid.Empty; // reset; next episode will re-capture
+        _playgroundId = Guid.Empty; // cleared; next Reset will re-capture via _isExpectingNewPlayground
     }
 
     private void OnHeroLost(HeroLostEvent evt)
@@ -175,6 +185,8 @@ public class Sb3Actions : IAiActions
     {
         if (cmd.GymId != GymId) return;
 
+        Console.WriteLine($"[Sb3Actions:{GymId:N}] OnSimulationReset firing, starting episode...");
+
         _resetCorrelationId = cmd.Id;
         _isWaitingForResetObservation = true;
 
@@ -182,13 +194,27 @@ public class Sb3Actions : IAiActions
             TaskCreationOptions.RunContinuationsAsynchronously);
         _resetResponseTcs = tcs;
 
-        // Start a new episode in the background
-        _ = _episodeCallback?.Invoke();
+        // Start a new episode in the background; propagate failures to reset TCS so Python gets an error
+        var capturedTcs = tcs;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                if (_episodeCallback != null)
+                    await _episodeCallback().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Sb3Actions:{GymId:N}] Episode callback FAILED: {ex.Message}");
+                capturedTcs.TrySetException(ex);
+            }
+        });
 
         // Await initial obs then publish response to SimulationService
         _ = Task.Run(async () =>
         {
             var response = await tcs.Task.ConfigureAwait(false);
+            Console.WriteLine($"[Sb3Actions:{GymId:N}] Reset TCS resolved, publishing SimulationResetResponse");
             _messageBroker.Publish(response);
         });
     }

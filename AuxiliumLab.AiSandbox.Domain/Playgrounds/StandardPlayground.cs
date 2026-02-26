@@ -105,8 +105,24 @@ public class StandardPlayground
         return _map.CutOutPartOfTheMap(center, radius);
     }
 
+    /// <summary>
+    /// Returns <c>true</c> if the given coordinates fall within the map boundaries.
+    /// Use this before calling <see cref="GetCell(Coordinates)"/> to avoid an
+    /// <see cref="ArgumentOutOfRangeException"/> when the coordinates may be out of range —
+    /// for example, when checking the cell one step ahead of an agent standing at a map edge.
+    /// </summary>
+    public bool IsInBounds(Coordinates coordinates)
+    {
+        return coordinates.X >= 0 && coordinates.X < _map.Width
+            && coordinates.Y >= 0 && coordinates.Y < _map.Height;
+    }
+
     public Cell GetCell(Coordinates coordinates)
     {
+        if (coordinates.X < 0 || coordinates.X >= _map.Width
+            || coordinates.Y < 0 || coordinates.Y >= _map.Height)
+            throw new ArgumentOutOfRangeException(
+                $"Coordinates ({coordinates.X}, {coordinates.Y}) are out of bounds (map {_map.Width}x{_map.Height}).");
         return _map.CellGrid[coordinates.X, coordinates.Y];
     }
 

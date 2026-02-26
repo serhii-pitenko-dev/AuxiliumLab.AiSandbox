@@ -57,12 +57,9 @@ public class TrainingRunner
             _ => throw new NotImplementedException($"Training for algorithm '{algorithmType}' is not implemented.")
         };
 
-        // 3. Resolve shared singleton dependencies
-        var messageBroker = _serviceProvider.GetRequiredService<IMessageBroker>();
-        var agentStateRepo = _serviceProvider.GetRequiredService<IMemoryDataManager<AgentStateForAIDecision>>();
+        // 3. Resolve shared singleton dependencies (must not contain per-gym mutable state)
         var playgroundRepo = _serviceProvider.GetRequiredService<IMemoryDataManager<StandardPlayground>>();
         var playgroundStateFileRepo = _serviceProvider.GetRequiredService<IFileDataManager<StandardPlaygroundState>>();
-        var msgBrokerRpc = _serviceProvider.GetRequiredService<IBrokerRpcClient>();
         var mapper = _serviceProvider.GetRequiredService<IStandardPlaygroundMapper>();
         var rawDataRepo = _serviceProvider.GetRequiredService<IFileDataManager<RawDataLog>>();
         var turnPerfRepo = _serviceProvider.GetRequiredService<IFileDataManager<TurnExecutionPerformance>>();
@@ -70,33 +67,47 @@ public class TrainingRunner
         var testPreconditionData = _serviceProvider.GetRequiredService<ITestPreconditionData>();
         var sandboxConfig = _serviceProvider.GetRequiredService<IOptions<SandBoxConfiguration>>();
 
-        // 4. Create PhysicalCores executor + Sb3Actions pairs
+        // 4. Create one executor + Sb3Actions pair per physical core.
         int nEnvs = Math.Max(1, training.PhysicalCores);
         var executorTasks = new List<Task>();
+        var gymIds = new List<Guid>();
 
         for (int i = 0; i < nEnvs; i++)
         {
             // Each executor requires a scoped IPlaygroundCommandsHandleService
             var scope = _serviceProvider.CreateScope();
             var playgroundCommands = scope.ServiceProvider
-                .GetRequiredService<AuxiliumLab.AiSandbox.ApplicationServices.Commands.Playground.IPlaygroundCommandsHandleService>();
+                .GetRequiredService<Commands.Playground.IPlaygroundCommandsHandleService>();
+
+            // Each gym gets its own isolated broker + rpc client so that:
+            //   1. Events from one gym's executor cannot leak to another gym's Sb3Actions.
+            //   2. There is no lock contention between gyms on a shared broker.
+            var gymBroker = new MessageBroker();
+            var gymRpcClient = new BrokerRpcClient(gymBroker);
+            var gymAgentStateRepo = new MemoryDataManager<AgentStateForAIDecision>();
 
             // Create a dedicated Sb3Actions for this gym
             var rewards = _trainingSettings.Rewards;
             var sb3 = _algorithmTypeProvider.Create(
-                algorithmType, messageBroker, agentStateRepo,
+                algorithmType, gymBroker, gymAgentStateRepo,
                 rewards.StepPenalty, rewards.WinReward, rewards.LossReward);
 
-            // Create StandardExecutor with Sb3Actions injected as IAiActions
-            var executor = new StandardExecutor(
+            // Track the gym's unique ID so it can be passed to Python
+            gymIds.Add(sb3.GymId);
+
+            // Each episode gets a fresh executor so no per-episode state
+            // (sandboxStatus, _playground, _agentsToAct, etc.) leaks between runs.
+            // Sb3Actions stays alive for the full training session since it owns
+            // the Python gRPC channel.
+            StandardExecutor CreateEpisodeExecutor() => new StandardExecutor(
                 playgroundCommands,
                 playgroundRepo,
                 sb3,
                 sandboxConfig,
                 playgroundStateFileRepo,
-                agentStateRepo,
-                messageBroker,
-                msgBrokerRpc,
+                gymAgentStateRepo,
+                gymBroker,
+                gymRpcClient,
                 mapper,
                 rawDataRepo,
                 turnPerfRepo,
@@ -104,10 +115,7 @@ public class TrainingRunner
                 testPreconditionData);
 
             // Set the episode callback so Sb3Actions can restart episodes
-            sb3.SetEpisodeCallback(() => executor.RunAsync());
-
-            // Initialize the Sb3Actions subscriptions
-            sb3.Initialize();
+            sb3.SetEpisodeCallback(() => CreateEpisodeExecutor().RunAsync());
 
             // Keep looping episodes until cancellation
             var execTask = Task.Run(async () =>
@@ -124,7 +132,8 @@ public class TrainingRunner
         // 5. Start training on the Python side
         Console.WriteLine($"[Training] Starting {algorithmType} training with {nEnvs} gym(s)...");
         Console.WriteLine($"[Training] Experiment: {training.BuildExperimentId()}");
-        await training.Run(_policyTrainerClient);
+        Console.WriteLine($"[Training] Gym IDs: {string.Join(", ", gymIds.Select(g => g.ToString("N")[..8]))}");
+        await training.Run(_policyTrainerClient, gymIds);
 
         // 6. Wait until cancellation (training is driven by Python gym calls)
         try

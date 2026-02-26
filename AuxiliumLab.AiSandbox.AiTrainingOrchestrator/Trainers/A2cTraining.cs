@@ -19,7 +19,7 @@ public class A2cTraining : BaseTraining, ITraining
 
     public string BuildExperimentId() => BuildExperimentId(_settings);
 
-    public TrainingRequest BuildTrainingRequest(TrainingAlgorithmSettings settings, int nEnvs)
+    public TrainingRequest BuildTrainingRequest(TrainingAlgorithmSettings settings, int nEnvs, IReadOnlyList<Guid> gymIds)
     {
         string experimentId = BuildExperimentId(settings);
         var request = new TrainingRequest
@@ -29,6 +29,7 @@ public class A2cTraining : BaseTraining, ITraining
         };
 
         request.Hyperparameters.Add("n_envs", nEnvs.ToString());
+        request.Hyperparameters.Add("gym_ids", string.Join(";", gymIds));
         foreach (var p in settings.Parameters)
         {
             if (p.Name == "total_timesteps")
@@ -42,10 +43,10 @@ public class A2cTraining : BaseTraining, ITraining
         return request;
     }
 
-    public async Task Run(IPolicyTrainerClient policyTrainerClient)
+    public async Task Run(IPolicyTrainerClient policyTrainerClient, IReadOnlyList<Guid> gymIds)
     {
         int nEnvs = Math.Max(1, PhysicalCores);
-        var request = BuildTrainingRequest(_settings, nEnvs);
+        var request = BuildTrainingRequest(_settings, nEnvs, gymIds);
         CancellationToken cancellationToken = new CancellationTokenSource(TimeSpan.FromHours(2)).Token;
         await policyTrainerClient.StartTrainingA2CAsync(request, cancellationToken);
     }

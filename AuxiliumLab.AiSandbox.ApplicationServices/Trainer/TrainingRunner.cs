@@ -82,7 +82,10 @@ public class TrainingRunner
                 .GetRequiredService<AuxiliumLab.AiSandbox.ApplicationServices.Commands.Playground.IPlaygroundCommandsHandleService>();
 
             // Create a dedicated Sb3Actions for this gym
-            var sb3 = _algorithmTypeProvider.Create(algorithmType, messageBroker, agentStateRepo);
+            var rewards = _trainingSettings.Rewards;
+            var sb3 = _algorithmTypeProvider.Create(
+                algorithmType, messageBroker, agentStateRepo,
+                rewards.StepPenalty, rewards.WinReward, rewards.LossReward);
 
             // Create StandardExecutor with Sb3Actions injected as IAiActions
             var executor = new StandardExecutor(

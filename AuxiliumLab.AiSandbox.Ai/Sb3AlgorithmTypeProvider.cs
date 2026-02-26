@@ -14,7 +14,10 @@ public class Sb3AlgorithmTypeProvider
     public Sb3Actions Create(
         ModelType modelType,
         IMessageBroker messageBroker,
-        IMemoryDataManager<AgentStateForAIDecision> agentStateMemoryRepository)
+        IMemoryDataManager<AgentStateForAIDecision> agentStateMemoryRepository,
+        float stepPenalty = -0.1f,
+        float winReward = 10f,
+        float lossReward = -10f)
     {
         var config = new AiConfiguration
         {
@@ -28,7 +31,10 @@ public class Sb3AlgorithmTypeProvider
             agentStateMemoryRepository,
             modelType,
             config,
-            Guid.NewGuid());
+            Guid.NewGuid(),
+            stepPenalty,
+            winReward,
+            lossReward);
     }
 }
 

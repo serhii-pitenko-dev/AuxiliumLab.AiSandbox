@@ -71,6 +71,14 @@ IExecutor (base interface)
   4. Saves state to file at configurable intervals.
   5. Sends `HeroWonEvent` or `HeroLostEvent` on termination.
 
+**Win / Loss conditions:**
+
+| Condition | Event published |
+|---|---|
+| Hero occupies the Exit cell | `HeroWonEvent(WinReason.ReachedExit)` |
+| An Enemy occupies the Hero's cell | `HeroLostEvent(LostReason.CaughtByEnemy)` |
+| `Turn >= MaxTurns` | `HeroLostEvent(LostReason.TurnLimitReached)` |
+
 **`StandardExecutor`**: inherits `Executor`, suppresses agent notification events, captures result as `ParticularRun`.
 
 **`ExecutorForPresentation`**: inherits `Executor`, publishes `OnBaseAgentActionEvent` and `TurnExecutedEvent` so the console renderer can animate changes.

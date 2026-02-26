@@ -50,6 +50,21 @@ event Action<Guid>? ReadyForRendering;
 
 Settings are loaded from `AuxiliumLab.AiSandbox.ConsolePresentation/Settings.json` and injected as `IOptions<ConsoleSettings>`.
 
+## Coordinate System
+The Domain uses `(0, 0)` at the **bottom-left** corner with Y increasing upward.  
+The terminal renders top-to-bottom, so the Y axis must be **flipped** when mapping domain coordinates to console row positions.
+
+For a 5×5 map the mapping is `consoleRow = (mapHeight - 1) - domainY`:
+```
+Domain → Console (5×5)
+
+X0Y0 → X0Y4    X1Y0 → X1Y4    X2Y0 → X2Y4
+X0Y1 → X0Y3    X1Y1 → X1Y3    X2Y1 → X2Y3
+X0Y2 → X0Y2    X1Y2 → X1Y2    X2Y2 → X2Y2
+X0Y3 → X0Y1    X1Y3 → X1Y1    X2Y3 → X2Y1
+X0Y4 → X0Y0    X1Y4 → X1Y0    X2Y4 → X2Y0
+```
+
 ## Cell Rendering
 Each `ObjectType` maps to a configurable character + colour:
 - `Empty` → space / background colour

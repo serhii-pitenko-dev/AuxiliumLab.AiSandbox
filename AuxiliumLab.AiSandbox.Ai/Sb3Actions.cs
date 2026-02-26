@@ -19,20 +19,20 @@ namespace AuxiliumLab.AiSandbox.Ai;
 /// </summary>
 public class Sb3Actions : IAiActions
 {
-    // ── Constants ─────────────────────────────────────────────────────────────
-    public const int ObservationSize = 126; // 5 agent features + 11x11 grid
-    private const int SightRadius = 5;
-    private const int GridSize = 11; // 2 * SightRadius + 1
-
     // ── Dependencies ──────────────────────────────────────────────────────────
     private readonly IMessageBroker _messageBroker;
     private readonly IMemoryDataManager<AgentStateForAIDecision> _agentStateMemoryRepository;
+
+    // ── Reward settings ───────────────────────────────────────────────────────
+    private readonly float _stepPenalty;
+    private readonly float _winReward;
+    private readonly float _lossReward;
 
     // ── State ─────────────────────────────────────────────────────────────────
     private Guid _playgroundId = Guid.Empty;
     private Func<Task>? _episodeCallback;
     private volatile bool _isWaitingForResetObservation;
-    private float[] _lastObservation = new float[ObservationSize];
+    private float[] _lastObservation = [];
 
     // TCS for the current Reset call (SimulationService awaits SimulationResetResponse)
     private TaskCompletionSource<SimulationResetResponse>? _resetResponseTcs;
@@ -58,13 +58,19 @@ public class Sb3Actions : IAiActions
         IMemoryDataManager<AgentStateForAIDecision> agentStateMemoryRepository,
         ModelType modelType,
         AiConfiguration aiConfiguration,
-        Guid gymId)
+        Guid gymId,
+        float stepPenalty = -0.1f,
+        float winReward = 10f,
+        float lossReward = -10f)
     {
         _messageBroker = messageBroker;
         _agentStateMemoryRepository = agentStateMemoryRepository;
         ModelType = modelType;
         GymId = gymId;
         AiConfiguration = aiConfiguration;
+        _stepPenalty = stepPenalty;
+        _winReward = winReward;
+        _lossReward = lossReward;
     }
 
     /// <summary>Called by RunTraining to restart simulation episodes.</summary>
@@ -120,7 +126,7 @@ public class Sb3Actions : IAiActions
             _stepResponseTcs = null;
             stepTcs?.TrySetResult(new SimulationStepResponse(
                 Guid.NewGuid(), GymId, _stepCorrelationId, obs,
-                -0.1f, false, false,
+                _stepPenalty, false, false,
                 new Dictionary<string, string>()));
         }
 
@@ -143,14 +149,14 @@ public class Sb3Actions : IAiActions
     private void OnHeroWon(HeroWonEvent evt)
     {
         if (evt.PlaygroundId != _playgroundId) return;
-        CompleteStep(+10f, terminated: true);
+        CompleteStep(_winReward, terminated: true);
         _playgroundId = Guid.Empty; // reset; next episode will re-capture
     }
 
     private void OnHeroLost(HeroLostEvent evt)
     {
         if (evt.PlaygroundId != _playgroundId) return;
-        CompleteStep(-10f, terminated: true);
+        CompleteStep(_lossReward, terminated: true);
         _playgroundId = Guid.Empty;
     }
 
@@ -223,28 +229,70 @@ public class Sb3Actions : IAiActions
 
     private float[] BuildObservation(AgentStateForAIDecision agent)
     {
-        var obs = new float[ObservationSize];
+        // Grid dimensions are derived entirely from the agent's SightRange,
+        // so this method stays correct regardless of configuration changes.
+        // SightRange cells in each direction + 1 center cell = one axis length.
+        int gridSize = 2 * agent.SightRange + 1;
 
-        // Agent features [0-4]
-        obs[0] = agent.Coordinates.X;
-        obs[1] = agent.Coordinates.Y;
-        obs[2] = agent.IsRun ? 1f : 0f;
-        obs[3] = agent.MaxStamina > 0 ? (float)agent.Stamina / agent.MaxStamina : 0f;
-        obs[4] = agent.Speed;
+        // 5 scalar features + gridSize² vision cells.
+        // Must stay in sync with the Python-side OBS_DIM = 5 + (2*SightRange+1)².
+        int observationSize = 5 + gridSize * gridSize;
 
-        // Grid [5-125]: -1 = not visible, else ObjectType int value
-        for (int i = 5; i < ObservationSize; i++) obs[i] = -1f;
+        var obs = new float[observationSize];
 
+        // ── Agent scalar features: indices 0–4 ────────────────────────────────
+        obs[0] = agent.Coordinates.X;   // Absolute column on the map (0-based).
+        obs[1] = agent.Coordinates.Y;   // Absolute row on the map (0-based).
+        obs[2] = agent.IsRun ? 1f : 0f; // Run mode: 1.0 = active, 0.0 = inactive.
+        obs[3] = agent.MaxStamina > 0 ? (float)agent.Stamina / agent.MaxStamina : 0f; // Stamina fraction [0,1].
+        obs[4] = agent.Speed;           // Cells traversable per turn.
+
+        // ── Local vision grid: indices 5 .. (5 + gridSize²−1) ────────────────
+        // The grid is centred on the agent. Each cell encodes ObjectType as float:
+        //   -1.0  →  not visible (outside SightRange or blocked by LOS)
+        //    0.0  →  ObjectType.Empty
+        //    1.0  →  ObjectType.Hero
+        //    2.0  →  ObjectType.Enemy
+        //    3.0  →  ObjectType.Block
+        //    4.0  →  ObjectType.Exit
+        // VisibleCells is already filtered by the domain (VisibilityService) —
+        // no re-filtering needed here.
+        for (int i = 5; i < observationSize; i++) obs[i] = -1f;
+
+        // Map each visible cell into the flat obs array using row-major order.
+        //
+        // The local grid is centred on the agent. With SightRange=2, gridSize=5:
+        //
+        //   gy=0 → map Y = agentY-2  (topmost row,    smallest Y)
+        //   gy=1 → map Y = agentY-1
+        //   gy=2 → map Y = agentY    ← agent row (centre)
+        //   gy=3 → map Y = agentY+1
+        //   gy=4 → map Y = agentY+2  (bottommost row, largest Y)
+        //
+        // Y increases downward (screen convention), matching action 0 = Y-1 (up)
+        // and action 1 = Y+1 (down).
+        //
+        // For agent at (X=3, Y=9), SightRange=2:
+        //   gy=0 → map Y=7:  (1,7)(2,7)(3,7)(4,7)(5,7)  → obs[5..9]
+        //   gy=1 → map Y=8:  (1,8)(2,8)(3,8)(4,8)(5,8)  → obs[10..14]
+        //   gy=2 → map Y=9:  (1,9)(2,9)(3,9)(4,9)(5,9)  → obs[15..19]  ← agent
+        //   gy=3 → map Y=10: (1,10)...(5,10)             → obs[20..24]
+        //   gy=4 → map Y=11: (1,11)...(5,11)             → obs[25..29]
+        //
+        // Index formula: obs[5 + gy * gridSize + gx]
+        //   gy * gridSize  — skip gy complete rows of gridSize cells each
+        //   + gx           — column within that row
+        //   + 5            — skip the 5 scalar features at the front
         foreach (var cell in agent.VisibleCells)
         {
             int dx = cell.Coordinates.X - agent.Coordinates.X;
             int dy = cell.Coordinates.Y - agent.Coordinates.Y;
-            if (Math.Abs(dx) <= SightRadius && Math.Abs(dy) <= SightRadius)
-            {
-                int gx = dx + SightRadius;
-                int gy = dy + SightRadius;
-                obs[5 + gy * GridSize + gx] = (float)cell.ObjectType;
-            }
+
+            // Shift delta into [0, gridSize-1]; agent sits at (SightRange, SightRange).
+            int gx = dx + agent.SightRange;
+            int gy = dy + agent.SightRange;
+
+            obs[5 + gy * gridSize + gx] = (float)cell.ObjectType;
         }
 
         return obs;

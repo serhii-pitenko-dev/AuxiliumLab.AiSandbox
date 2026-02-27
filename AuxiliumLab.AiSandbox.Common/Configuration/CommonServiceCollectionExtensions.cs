@@ -9,6 +9,7 @@ public static class CommonServiceCollectionExtensions
     {
         services.AddSingleton<IMessageBroker, MessageBroker.MessageBroker>();
         services.AddSingleton<IBrokerRpcClient, BrokerRpcClient>();
+        services.AddSingleton<GymBrokerRegistry>();
 
         return services;
     }

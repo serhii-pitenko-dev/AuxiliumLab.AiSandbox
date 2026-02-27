@@ -9,16 +9,20 @@ namespace AuxiliumLab.AiSandbox.GrpcHost.Services;
 /// <summary>
 /// gRPC service that bridges Python SB3 gym calls to internal Sb3Contract MessageBroker messages.
 /// Each gym (identified by gym_id) maps to one Sb3Actions instance in the C# simulation.
+///
+/// Uses <see cref="GymBrokerRegistry"/> to route each call to the correct per-gym isolated
+/// <see cref="IMessageBroker"/> — the singleton broker is NOT used here, because Sb3Actions
+/// subscribes on a per-gym broker, not the shared DI singleton.
 /// </summary>
 public class SimulationService : Protos.SimulationService.SimulationServiceBase
 {
     private readonly ILogger<SimulationService> _logger;
-    private readonly IMessageBroker _messageBroker;
+    private readonly GymBrokerRegistry _gymBrokerRegistry;
 
-    public SimulationService(ILogger<SimulationService> logger, IMessageBroker messageBroker)
+    public SimulationService(ILogger<SimulationService> logger, GymBrokerRegistry gymBrokerRegistry)
     {
         _logger = logger;
-        _messageBroker = messageBroker;
+        _gymBrokerRegistry = gymBrokerRegistry;
     }
 
     public override async Task<ResetResponse> Reset(ResetRequest request, ServerCallContext context)
@@ -26,6 +30,8 @@ public class SimulationService : Protos.SimulationService.SimulationServiceBase
         Guid gymId = ParseGymId(request.GymId);
         _logger.LogInformation("Reset called for gym {GymId}, seed {Seed}", gymId, request.Seed);
         Console.WriteLine($"[SimulationService] Reset request for gym_id={gymId}");
+
+        var broker = GetGymBroker(gymId);
 
         var commandId = Guid.NewGuid();
         var tcs = new TaskCompletionSource<SimulationResetResponse>(
@@ -36,13 +42,13 @@ public class SimulationService : Protos.SimulationService.SimulationServiceBase
         {
             if (msg.GymId == gymId && msg.CorrelationId == commandId)
             {
-                _messageBroker.Unsubscribe(handler);
+                broker.Unsubscribe(handler);
                 tcs.TrySetResult(msg);
             }
         };
-        _messageBroker.Subscribe(handler);
+        broker.Subscribe(handler);
 
-        _messageBroker.Publish(new RequestSimulationResetCommand(commandId, gymId, request.Seed));
+        broker.Publish(new RequestSimulationResetCommand(commandId, gymId, request.Seed));
         Console.WriteLine($"[SimulationService] Published RequestSimulationResetCommand for gym_id={gymId}");
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken);
@@ -64,6 +70,8 @@ public class SimulationService : Protos.SimulationService.SimulationServiceBase
         Guid gymId = ParseGymId(request.GymId);
         _logger.LogDebug("Step called for gym {GymId}, action {Action}", gymId, request.Action);
 
+        var broker = GetGymBroker(gymId);
+
         var commandId = Guid.NewGuid();
         var tcs = new TaskCompletionSource<SimulationStepResponse>(
             TaskCreationOptions.RunContinuationsAsynchronously);
@@ -73,13 +81,13 @@ public class SimulationService : Protos.SimulationService.SimulationServiceBase
         {
             if (msg.GymId == gymId && msg.CorrelationId == commandId)
             {
-                _messageBroker.Unsubscribe(handler);
+                broker.Unsubscribe(handler);
                 tcs.TrySetResult(msg);
             }
         };
-        _messageBroker.Subscribe(handler);
+        broker.Subscribe(handler);
 
-        _messageBroker.Publish(new RequestSimulationStepCommand(commandId, gymId, request.Action));
+        broker.Publish(new RequestSimulationStepCommand(commandId, gymId, request.Action));
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken);
         cts.CancelAfter(TimeSpan.FromSeconds(60));  // 60s: must exceed Python's 30s Step timeout
@@ -105,6 +113,8 @@ public class SimulationService : Protos.SimulationService.SimulationServiceBase
         Guid gymId = ParseGymId(request.GymId);
         _logger.LogInformation("Close called for gym {GymId}", gymId);
 
+        var broker = GetGymBroker(gymId);
+
         var commandId = Guid.NewGuid();
         var tcs = new TaskCompletionSource<SimulationCloseResponse>(
             TaskCreationOptions.RunContinuationsAsynchronously);
@@ -114,13 +124,13 @@ public class SimulationService : Protos.SimulationService.SimulationServiceBase
         {
             if (msg.GymId == gymId && msg.CorrelationId == commandId)
             {
-                _messageBroker.Unsubscribe(handler);
+                broker.Unsubscribe(handler);
                 tcs.TrySetResult(msg);
             }
         };
-        _messageBroker.Subscribe(handler);
+        broker.Subscribe(handler);
 
-        _messageBroker.Publish(new RequestSimulationCloseCommand(commandId, gymId));
+        broker.Publish(new RequestSimulationCloseCommand(commandId, gymId));
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken);
         cts.CancelAfter(TimeSpan.FromSeconds(10));
@@ -129,6 +139,16 @@ public class SimulationService : Protos.SimulationService.SimulationServiceBase
         var result = await tcs.Task.ConfigureAwait(false);
 
         return new CloseResponse { Success = result.Success, Message = "Environment closed" };
+    }
+
+    private IMessageBroker GetGymBroker(Guid gymId)
+    {
+        var broker = _gymBrokerRegistry.Get(gymId);
+        if (broker is null)
+            throw new RpcException(new Status(StatusCode.NotFound,
+                $"No broker registered for gym_id '{gymId}'. "
+                + "Ensure TrainingRunner has registered the gym before Python calls Reset/Step/Close."));
+        return broker;
     }
 
     private static Guid ParseGymId(string gymId)

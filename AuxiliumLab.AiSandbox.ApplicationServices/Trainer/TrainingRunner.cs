@@ -1,7 +1,9 @@
 using AuxiliumLab.AiSandbox.Ai;
 using AuxiliumLab.AiSandbox.Ai.Configuration;
+using AuxiliumLab.AiSandbox.AiTrainingOrchestrator;
 using AuxiliumLab.AiSandbox.AiTrainingOrchestrator.Configuration;
 using AuxiliumLab.AiSandbox.AiTrainingOrchestrator.GrpcClients;
+using AuxiliumLab.AiSandbox.AiTrainingOrchestrator.PolicyTrainer;
 using AuxiliumLab.AiSandbox.AiTrainingOrchestrator.Trainers;
 using AuxiliumLab.AiSandbox.ApplicationServices.Executors;
 using AuxiliumLab.AiSandbox.ApplicationServices.Runner.LogsDto;
@@ -26,17 +28,20 @@ public class TrainingRunner
     private readonly TrainingSettings _trainingSettings;
     private readonly Sb3AlgorithmTypeProvider _algorithmTypeProvider;
     private readonly IPolicyTrainerClient _policyTrainerClient;
+    private readonly GymBrokerRegistry _gymBrokerRegistry;
 
     public TrainingRunner(
         IServiceProvider serviceProvider,
         TrainingSettings trainingSettings,
         Sb3AlgorithmTypeProvider algorithmTypeProvider,
-        IPolicyTrainerClient policyTrainerClient)
+        IPolicyTrainerClient policyTrainerClient,
+        GymBrokerRegistry gymBrokerRegistry)
     {
         _serviceProvider = serviceProvider;
         _trainingSettings = trainingSettings;
         _algorithmTypeProvider = algorithmTypeProvider;
         _policyTrainerClient = policyTrainerClient;
+        _gymBrokerRegistry = gymBrokerRegistry;
     }
 
     public async Task RunTrainingAsync(ModelType algorithmType, CancellationToken cancellationToken = default)
@@ -95,6 +100,10 @@ public class TrainingRunner
             // Track the gym's unique ID so it can be passed to Python
             gymIds.Add(sb3.GymId);
 
+            // Register the per-gym broker so SimulationService can route Reset/Step/Close
+            // to the correct Sb3Actions instance (instead of the shared singleton broker).
+            _gymBrokerRegistry.Register(sb3.GymId, gymBroker);
+
             // Each episode gets a fresh executor so no per-episode state
             // (sandboxStatus, _playground, _agentsToAct, etc.) leaks between runs.
             // Sb3Actions stays alive for the full training session since it owns
@@ -129,13 +138,43 @@ public class TrainingRunner
             executorTasks.Add(execTask);
         }
 
-        // 5. Start training on the Python side
+        // 5. Negotiate environment contract with Python before starting training.
+        //    This replaces the old silent coupling where obs_dim was hard-coded
+        //    on both sides. Any mismatch is now a hard error here.
+        string experimentId = training.BuildExperimentId();
+        var spec = EnvironmentSpecBuilder.Build(sandboxConfig.Value, experimentId);
+        var negotiationCt = new CancellationTokenSource(TimeSpan.FromSeconds(30)).Token;
+        NegotiateEnvironmentResponse negotiation;
+        try
+        {
+            negotiation = await _policyTrainerClient.NegotiateEnvironmentAsync(
+                new NegotiateEnvironmentRequest { ExperimentId = experimentId, Spec = spec },
+                negotiationCt);
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException(
+                $"[Training] NegotiateEnvironment RPC failed for experiment '{experimentId}': {ex.Message}", ex);
+        }
+
+        if (!negotiation.Accepted)
+            throw new InvalidOperationException(
+                $"[Training] Python RL service rejected environment spec for experiment '{experimentId}': "
+                + negotiation.Message);
+
+        EnvironmentSpecBuilder.AssertEchoMatches(spec, negotiation.EchoedSpec, experimentId);
+
+        Console.WriteLine(
+            $"[Training] Environment spec negotiated: obs_dim={spec.ObservationDim}, "
+            + $"action_dim={spec.ActionDim}, sight_range={spec.SightRange}.");
+
+        // 6. Start training on the Python side
         Console.WriteLine($"[Training] Starting {algorithmType} training with {nEnvs} gym(s)...");
-        Console.WriteLine($"[Training] Experiment: {training.BuildExperimentId()}");
+        Console.WriteLine($"[Training] Experiment: {experimentId}");
         Console.WriteLine($"[Training] Gym IDs: {string.Join(", ", gymIds.Select(g => g.ToString("N")[..8]))}");
         await training.Run(_policyTrainerClient, gymIds);
 
-        // 6. Wait until cancellation (training is driven by Python gym calls)
+        // 7. Wait until cancellation (training is driven by Python gym calls)
         try
         {
             await Task.WhenAll(executorTasks).ConfigureAwait(false);
@@ -143,6 +182,12 @@ public class TrainingRunner
         catch (OperationCanceledException)
         {
             Console.WriteLine("[Training] Training cancelled.");
+        }
+        finally
+        {
+            // Clean up broker registrations so stale gym IDs don't linger
+            foreach (var id in gymIds)
+                _gymBrokerRegistry.Unregister(id);
         }
     }
 }

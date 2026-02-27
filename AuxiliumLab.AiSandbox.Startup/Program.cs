@@ -8,6 +8,7 @@ using AuxiliumLab.AiSandbox.ApplicationServices.Runner.MassRunner;
 using AuxiliumLab.AiSandbox.ApplicationServices.Runner.SingleRunner;
 using AuxiliumLab.AiSandbox.ApplicationServices.Trainer;
 using AuxiliumLab.AiSandbox.Common.Extensions;
+using AuxiliumLab.AiSandbox.Common.MessageBroker;
 using AuxiliumLab.AiSandbox.ConsolePresentation;
 using AuxiliumLab.AiSandbox.ConsolePresentation.Configuration;
 using AuxiliumLab.AiSandbox.Domain.Configuration;
@@ -117,7 +118,8 @@ try
                 host.Services,
                 host.Services.GetRequiredService<TrainingSettings>(),
                 host.Services.GetRequiredService<Sb3AlgorithmTypeProvider>(),
-                host.Services.GetRequiredService<IPolicyTrainerClient>());
+                host.Services.GetRequiredService<IPolicyTrainerClient>(),
+                host.Services.GetRequiredService<GymBrokerRegistry>());
 
             await runTraining.RunTrainingAsync(
                 selectedAlgorithm ?? ModelType.PPO,

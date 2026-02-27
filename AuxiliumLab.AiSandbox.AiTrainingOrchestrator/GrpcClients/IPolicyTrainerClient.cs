@@ -9,6 +9,15 @@ namespace AuxiliumLab.AiSandbox.AiTrainingOrchestrator.GrpcClients;
 public interface IPolicyTrainerClient : IDisposable
 {
     /// <summary>
+    /// Negotiate the environment contract with the Python RL service before training.
+    /// Must be called once per experiment with the environment spec built by
+    /// <see cref="EnvironmentSpecBuilder.Build"/>.
+    /// The Python side validates the spec and returns a hard error on mismatch.
+    /// </summary>
+    Task<NegotiateEnvironmentResponse> NegotiateEnvironmentAsync(
+        NegotiateEnvironmentRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Start training a PPO model.
     /// </summary>
     Task<TrainingResponse> StartTrainingPPOAsync(TrainingRequest request, CancellationToken cancellationToken = default);

@@ -24,6 +24,13 @@ public class PolicyTrainerClient : IPolicyTrainerClient
         _client = new PolicyTrainerService.PolicyTrainerServiceClient(_channel);
     }
 
+    public async Task<NegotiateEnvironmentResponse> NegotiateEnvironmentAsync(
+        NegotiateEnvironmentRequest request,
+        CancellationToken cancellationToken = default)
+    {
+        return await _client.NegotiateEnvironmentAsync(request, cancellationToken: cancellationToken);
+    }
+
     public async Task<TrainingResponse> StartTrainingPPOAsync(
         TrainingRequest request,
         CancellationToken cancellationToken = default)

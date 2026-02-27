@@ -53,6 +53,15 @@ public abstract class Executor : IExecutor
     private SandboxExecutionPerformance sandboxExecutionPerformance;
 
     /// <summary>
+    /// When <c>true</c>, the playground state is persisted to the file repository
+    /// before <see cref="GameStartedEvent"/> is published so that a presentation layer
+    /// (e.g. <see cref="ConsoleRunner"/>) can load it in its OnGameStarted handler.
+    /// Non-interactive executors (mass runs, training) should leave this <c>false</c>
+    /// to avoid unnecessary I/O on every simulation.
+    /// </summary>
+    protected virtual bool NeedsStatePersistence => false;
+
+    /// <summary>
     /// The configuration active for the current run.
     /// Falls back to the injected <see cref="_configuration"/> when no override is supplied via <see cref="RunAsync"/>.
     /// </summary>
@@ -130,7 +139,9 @@ public abstract class Executor : IExecutor
     {
         // Initialize AI module
         _aiActions.Initialize();
-        await SaveAsync();
+
+        if (NeedsStatePersistence)
+            await SaveAsync();
 
         //Before starting the simulation, let all agents look around to have initial visible cells data in the repository for AI decision making
         _playground.LookAroundEveryone();
@@ -147,7 +158,8 @@ public abstract class Executor : IExecutor
         catch (Exception ex)
         {
             await CreateRawLog($"Playground with id {_playground.Id} crashed. Exception: {ex.Message}");
-            await SaveAsync();
+            if (NeedsStatePersistence)
+                await SaveAsync();
             throw;
         }
     }
@@ -259,8 +271,8 @@ public abstract class Executor : IExecutor
 
     private async Task SaveAsync()
     {
-        //var dataToSave = _standardPlaygroundMapper.ToState(_playground);
-        //await _playgroundStateFileRepository.SaveOrAppendAsync(_playground.Id, dataToSave);
+        StandardPlaygroundState dataToSave = _standardPlaygroundMapper.ToState(_playground);
+        await _playgroundStateFileRepository.SaveOrAppendAsync(_playground.Id, dataToSave);
     }
 
 

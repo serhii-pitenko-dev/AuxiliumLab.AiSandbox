@@ -19,6 +19,9 @@ namespace AuxiliumLab.AiSandbox.ApplicationServices.Executors;
 
 public class ExecutorForPresentation : Executor, IExecutorForPresentation
 {
+    /// <inheritdoc/>
+    protected override bool NeedsStatePersistence => true;
+
     public ExecutorForPresentation(
         IPlaygroundCommandsHandleService mapCommands,
         IMemoryDataManager<StandardPlayground> sandboxRepository,

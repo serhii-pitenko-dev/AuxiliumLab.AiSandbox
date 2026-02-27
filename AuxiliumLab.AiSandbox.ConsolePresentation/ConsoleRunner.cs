@@ -199,26 +199,17 @@ public class ConsoleRunner : IConsoleRunner
             affectedCellsToRerender.Add(newCell.Coordinates);
         }
 
-        // Step 4: Add the from/to coordinates to ensure agent position is updated
-        affectedCellsToRerender.Add(moveEvent.From);
-        affectedCellsToRerender.Add(moveEvent.To);
-
-        // Update the actual object positions in the map
-        // Clear the "from" cell
-        MapCell fromCell = _fullMapLayout.Cells[moveEvent.From.X, moveEvent.From.Y];
-        _fullMapLayout.Cells[moveEvent.From.X, moveEvent.From.Y] = fromCell with
-        {
-            ObjectId = Guid.Empty,
-            ObjectType = ObjectType.Empty
-        };
-
-        // Set the "to" cell
-        MapCell toCell = _fullMapLayout.Cells[moveEvent.To.X, moveEvent.To.Y];
-        _fullMapLayout.Cells[moveEvent.To.X, moveEvent.To.Y] = toCell with
-        {
-            ObjectId = moveEvent.AgentId,
-            ObjectType = fromCell.ObjectType // Preserve the agent type (Hero/Enemy)
-        };
+        // Step 4: Apply move result to local map state.
+        // Uses ConsoleMapState.ApplyAgentMove which handles the IsSuccess guard:
+        // successful → clear "from", stamp "to"; failed → only queue "from" for
+        // re-render so the agent icon is never erased from its real position.
+        ConsoleMapState.ApplyAgentMove(
+            _fullMapLayout.Cells,
+            moveEvent.From,
+            moveEvent.To,
+            moveEvent.AgentId,
+            moveEvent.IsSuccess,
+            affectedCellsToRerender);
 
         // Step 5: Re-render all affected cells
         RerenderCells(affectedCellsToRerender);

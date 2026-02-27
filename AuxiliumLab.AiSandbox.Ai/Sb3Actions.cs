@@ -251,97 +251,14 @@ public class Sb3Actions : IAiActions
         _messageBroker.Publish(new SimulationCloseResponse(Guid.NewGuid(), GymId, cmd.Id, true));
     }
 
-    // ── Observation builder ───────────────────────────────────────────────────
+    // ── Observation builder (delegated to shared ObservationBuilder) ──────────
 
-    private float[] BuildObservation(AgentStateForAIDecision agent)
-    {
-        // Grid dimensions are derived entirely from the agent's SightRange,
-        // so this method stays correct regardless of configuration changes.
-        // SightRange cells in each direction + 1 center cell = one axis length.
-        int gridSize = 2 * agent.SightRange + 1;
+    private static float[] BuildObservation(AgentStateForAIDecision agent)
+        => ObservationBuilder.Build(agent);
 
-        // 5 scalar features + gridSize² vision cells.
-        // Must stay in sync with the Python-side OBS_DIM = 5 + (2*SightRange+1)².
-        int observationSize = 5 + gridSize * gridSize;
-
-        var obs = new float[observationSize];
-
-        // ── Agent scalar features: indices 0–4 ────────────────────────────────
-        obs[0] = agent.Coordinates.X;   // Absolute column on the map (0-based).
-        obs[1] = agent.Coordinates.Y;   // Absolute row on the map (0-based).
-        obs[2] = agent.IsRun ? 1f : 0f; // Run mode: 1.0 = active, 0.0 = inactive.
-        obs[3] = agent.MaxStamina > 0 ? (float)agent.Stamina / agent.MaxStamina : 0f; // Stamina fraction [0,1].
-        obs[4] = agent.Speed;           // Cells traversable per turn.
-
-        // ── Local vision grid: indices 5 .. (5 + gridSize²−1) ────────────────
-        // The grid is centred on the agent. Each cell encodes ObjectType as float:
-        //   -1.0  →  not visible (outside SightRange or blocked by LOS)
-        //    0.0  →  ObjectType.Empty
-        //    1.0  →  ObjectType.Hero
-        //    2.0  →  ObjectType.Enemy
-        //    3.0  →  ObjectType.Block
-        //    4.0  →  ObjectType.Exit
-        //    5.0  →  ObjectType.BorderBlock  (perimeter wall — treated as a wall by the agent)
-        // VisibleCells is already filtered by the domain (VisibilityService) —
-        // no re-filtering needed here.
-        for (int i = 5; i < observationSize; i++) obs[i] = -1f;
-
-        // Map each visible cell into the flat obs array using row-major order.
-        //
-        // The local grid is centred on the agent. With SightRange=2, gridSize=5:
-        //
-        //   gy=0 → map Y = agentY-2  (topmost row,    smallest Y)
-        //   gy=1 → map Y = agentY-1
-        //   gy=2 → map Y = agentY    ← agent row (centre)
-        //   gy=3 → map Y = agentY+1
-        //   gy=4 → map Y = agentY+2  (bottommost row, largest Y)
-        //
-        // Y increases downward (screen convention), matching action 0 = Y-1 (up)
-        // and action 1 = Y+1 (down).
-        //
-        // For agent at (X=3, Y=9), SightRange=2:
-        //   gy=0 → map Y=7:  (1,7)(2,7)(3,7)(4,7)(5,7)  → obs[5..9]
-        //   gy=1 → map Y=8:  (1,8)(2,8)(3,8)(4,8)(5,8)  → obs[10..14]
-        //   gy=2 → map Y=9:  (1,9)(2,9)(3,9)(4,9)(5,9)  → obs[15..19]  ← agent
-        //   gy=3 → map Y=10: (1,10)...(5,10)             → obs[20..24]
-        //   gy=4 → map Y=11: (1,11)...(5,11)             → obs[25..29]
-        //
-        // Index formula: obs[5 + gy * gridSize + gx]
-        //   gy * gridSize  — skip gy complete rows of gridSize cells each
-        //   + gx           — column within that row
-        //   + 5            — skip the 5 scalar features at the front
-        foreach (var cell in agent.VisibleCells)
-        {
-            int dx = cell.Coordinates.X - agent.Coordinates.X;
-            int dy = cell.Coordinates.Y - agent.Coordinates.Y;
-
-            // Shift delta into [0, gridSize-1]; agent sits at (SightRange, SightRange).
-            int gx = dx + agent.SightRange;
-            int gy = dy + agent.SightRange;
-
-            obs[5 + gy * gridSize + gx] = (float)cell.ObjectType;
-        }
-
-        return obs;
-    }
-
-    // ── Action decoder ────────────────────────────────────────────────────────
+    // ── Action decoder (delegated to shared ObservationBuilder) ──────────────
 
     private static AgentDecisionBaseResponse BuildDecisionResponse(
         Guid correlationId, Guid agentId, Coordinates from, int action)
-    {
-        return action switch
-        {
-            0 => new AgentDecisionMoveResponse(Guid.NewGuid(), agentId,
-                     from, new Coordinates(from.X, Math.Max(0, from.Y - 1)), correlationId, true),
-            1 => new AgentDecisionMoveResponse(Guid.NewGuid(), agentId,
-                     from, new Coordinates(from.X, from.Y + 1), correlationId, true),
-            2 => new AgentDecisionMoveResponse(Guid.NewGuid(), agentId,
-                     from, new Coordinates(Math.Max(0, from.X - 1), from.Y), correlationId, true),
-            3 => new AgentDecisionMoveResponse(Guid.NewGuid(), agentId,
-                     from, new Coordinates(from.X + 1, from.Y), correlationId, true),
-            _ => new AgentDecisionUseAbilityResponse(Guid.NewGuid(), agentId,
-                     true, AgentAction.Run, correlationId, true)
-        };
-    }
+        => ObservationBuilder.BuildDecisionResponse(correlationId, agentId, from, action);
 }

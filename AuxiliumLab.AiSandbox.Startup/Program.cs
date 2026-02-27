@@ -1,5 +1,6 @@
 using AuxiliumLab.AiSandbox.Ai;
 using AuxiliumLab.AiSandbox.Ai.Configuration;
+using AuxiliumLab.AiSandbox.AiTrainingOrchestrator;
 using AuxiliumLab.AiSandbox.AiTrainingOrchestrator.Configuration;
 using AuxiliumLab.AiSandbox.AiTrainingOrchestrator.GrpcClients;
 using AuxiliumLab.AiSandbox.ApplicationServices.Configuration;
@@ -17,6 +18,8 @@ using AuxiliumLab.AiSandbox.GrpcHost.Configuration;
 using AuxiliumLab.AiSandbox.Infrastructure.Configuration;
 using AuxiliumLab.AiSandbox.Infrastructure.Configuration.Preconditions;
 using AuxiliumLab.AiSandbox.Infrastructure.FileManager;
+using AuxiliumLab.AiSandbox.Infrastructure.MemoryManager;
+using AuxiliumLab.AiSandbox.SharedBaseTypes.AiContract.Dto;
 using AuxiliumLab.AiSandbox.SharedBaseTypes.ValueObjects.StartupSettings;
 using AuxiliumLab.AiSandbox.Startup.Configuration;
 using AuxiliumLab.AiSandbox.Startup.Menu;
@@ -85,6 +88,31 @@ else
         .ConfigureServices((ctx, services) =>
         {
             RegisterCoreServices(services, ctx.Configuration, startupSettings.ExecutionMode);
+
+            // For trained simulation modes, override IAiActions with InferenceActions
+            // which calls the Python Act RPC with the pre-trained model path.
+            if (startupSettings.ExecutionMode is ExecutionMode.SingleTrainedAISimulation
+                                              or ExecutionMode.MassTrainedAISimulation)
+            {
+                var modelPath = startupSettings.TrainedModelPath;
+                var modelType = Path.GetFileName(modelPath)
+                    .StartsWith("a2c", StringComparison.OrdinalIgnoreCase) ? ModelType.A2C
+                    : Path.GetFileName(modelPath)
+                    .StartsWith("dqn", StringComparison.OrdinalIgnoreCase) ? ModelType.DQN
+                    : ModelType.PPO;
+                var aiConfig = new AiConfiguration
+                {
+                    ModelType  = modelType,
+                    Version    = "1.0",
+                    PolicyType = startupSettings.PolicyType
+                };
+                services.AddScoped<IAiActions>(sp => new InferenceActions(
+                    sp.GetRequiredService<IMessageBroker>(),
+                    sp.GetRequiredService<IMemoryDataManager<AgentStateForAIDecision>>(),
+                    sp.GetRequiredService<IPolicyTrainerClient>(),
+                    modelPath,
+                    aiConfig));
+            }
 
             if (isConsole)
                 services.AddConsolePresentationServices(ctx.Configuration);
@@ -179,11 +207,49 @@ try
             break;
         }
 
-        // ── Not yet implemented ───────────────────────────────────────────────
+        // ── Single trained AI simulation ───────────────────────────────────────────
         case ExecutionMode.SingleTrainedAISimulation:
-            throw new NotImplementedException("SingleTrainedAISimulation is not yet implemented.");
+        {
+            using var scope = host.Services.CreateScope();
+            var executorFactory = scope.ServiceProvider.GetRequiredService<IExecutorFactory>();
+            await new SingleRunner(sandboxConfiguration.Value).RunSingleTrainedAsync(
+                executorFactory.CreateStandardExecutor());
+            break;
+        }
+
+        // ── Mass trained AI simulations ──────────────────────────────────────────
         case ExecutionMode.MassTrainedAISimulation:
-            throw new NotImplementedException("MassTrainedAISimulation is not yet implemented.");
+        {
+            using var scope = host.Services.CreateScope();
+            var executorFactory  = scope.ServiceProvider.GetRequiredService<IExecutorFactory>();
+            var batchFileManager = scope.ServiceProvider.GetRequiredService<IFileDataManager<GeneralBatchRunInformation>>();
+
+            string massRunStatsFolder = System.IO.Path.Combine(
+                sandboxConfiguration.Value.MapSettings.FileSource.Path,
+                "MASS_RUN_STATISTICS");
+            var statisticFileManager = new StatisticFileDataManager(massRunStatsFolder);
+
+            var simulationStartupSettings = new SimulationStartupSettings
+            {
+                PolicyType              = startupSettings.PolicyType.ToString(),
+                ExecutionMode           = startupSettings.ExecutionMode.ToString(),
+                StandardSimulationCount = startupSettings.StandardSimulationCount,
+                IncrementalProperties   = new SimulationIncrementalPropertiesSettings
+                {
+                    SimulationCount = startupSettings.IncrementalProperties.SimulationCount,
+                    Properties      = startupSettings.IncrementalProperties.Properties,
+                },
+            };
+
+            await new MassRunner(batchFileManager, statisticFileManager, sandboxConfiguration)
+                .RunManyAsync(
+                    executorFactory,
+                    startupSettings.StandardSimulationCount,
+                    startupSettings: simulationStartupSettings);
+            break;
+        }
+
+        // ── Not yet implemented ────────────────────────────────────────────────────
         case ExecutionMode.LoadSimulation:
             throw new NotImplementedException("LoadSimulation is not yet implemented.");
     }

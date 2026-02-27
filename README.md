@@ -62,6 +62,23 @@ dotnet build AuxiliumLab.AiSandbox.sln
 dotnet run --project AuxiliumLab.AiSandbox.Startup
 ```
 
+## Build Configuration — Directory.Build.props
+
+Solution-wide MSBuild properties are defined in `Directory.Build.props` at the solution root.  
+In **Debug** builds you can opt-in to additional diagnostic constants by uncommenting the relevant line:
+
+```xml
+<DefineConstants>$(DefineConstants);CONSOLE_PRESENTATION_DEBUG;PERFORMANCE_ANALYSIS;PERFORMANCE_DETAILED_ANALYSIS</DefineConstants>
+```
+
+| Constant | Effect |
+|---|---|
+| `CONSOLE_PRESENTATION_DEBUG` | Enables verbose debug output in the `ConsolePresentation` layer (frame timings, render traces) |
+| `PERFORMANCE_ANALYSIS` | Activates coarse-grained performance instrumentation across hot paths |
+| `PERFORMANCE_DETAILED_ANALYSIS` | Adds fine-grained per-step timing; implies `PERFORMANCE_ANALYSIS` overhead |
+
+By default all three constants are **disabled** in every configuration. To enable them, edit `Directory.Build.props` and uncomment the `DefineConstants` line shown above.
+
 ## Execution Modes
 
 | Mode | Description |

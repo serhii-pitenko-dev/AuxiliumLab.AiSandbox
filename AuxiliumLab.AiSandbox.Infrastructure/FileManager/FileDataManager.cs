@@ -1,6 +1,6 @@
 using AuxiliumLab.AiSandbox.Domain;
 using AuxiliumLab.AiSandbox.Domain.Maps;
-using AuxiliumLab.AiSandbox.Infrastructure.Configuration.Preconditions;
+using AuxiliumLab.AiSandbox.Infrastructure.Configuration;
 using AuxiliumLab.AiSandbox.Infrastructure.Converters;
 using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
@@ -15,13 +15,13 @@ public class FileDataManager<T>: IFileDataManager<T>
     private readonly JsonSerializerOptions _jsonOptions;
     private static readonly ConcurrentDictionary<string, SemaphoreSlim> _fileLocks = new();
     
-    public FileDataManager(IOptions<SandBoxConfiguration> SandBoxSettings)
+    public FileDataManager(IOptions<FileSourceConfiguration> fileSourceOptions)
     {
-        var fileSource = SandBoxSettings.Value.MapSettings.FileSource;
-        
-        // Use the Path from appsettings.json, or fallback to default if not configured
-        string basePath = !string.IsNullOrWhiteSpace(fileSource.Path) 
-            ? fileSource.Path 
+        var fileStorage = fileSourceOptions.Value.FileStorage;
+
+        // Use BasePath from appsettings.json, or fallback to default if not configured
+        string basePath = !string.IsNullOrWhiteSpace(fileStorage.BasePath)
+            ? fileStorage.BasePath
             : Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "FileStorage");
         
         // Create base folder with the name of generic type T

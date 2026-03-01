@@ -37,9 +37,6 @@ public static class GrpcTrainingHost
             ?? new TrainingSettings();
         builder.Services.AddSingleton(trainingSettings);
 
-        // ── Training-specific: gRPC client (C# → Python) ─────────────────────
-        builder.Services.AddPolicyTrainerClient(builder.Configuration);
-
         // ── Training-specific: gRPC server (Python → C#) on port 50062 ───────
         builder.Services.AddGrpc();
         builder.WebHost.ConfigureKestrel(opts =>

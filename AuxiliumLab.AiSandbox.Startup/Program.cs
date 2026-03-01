@@ -5,6 +5,7 @@ using AuxiliumLab.AiSandbox.AiTrainingOrchestrator.Configuration;
 using AuxiliumLab.AiSandbox.AiTrainingOrchestrator.GrpcClients;
 using AuxiliumLab.AiSandbox.ApplicationServices.Configuration;
 using AuxiliumLab.AiSandbox.ApplicationServices.Executors;
+using AuxiliumLab.AiSandbox.ApplicationServices.Runner.AggregationRunner;
 using AuxiliumLab.AiSandbox.ApplicationServices.Runner.MassRunner;
 using AuxiliumLab.AiSandbox.ApplicationServices.Runner.SingleRunner;
 using AuxiliumLab.AiSandbox.ApplicationServices.Trainer;
@@ -34,7 +35,9 @@ using Microsoft.Extensions.Options;
 // ── 1. Read settings early (before building host) ────────────────────────────
 var configuration = new ConfigurationBuilder()
     .SetBasePath(Directory.GetCurrentDirectory())
-    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: false)
+    .AddJsonFile("appsettings.json",            optional: false, reloadOnChange: false)
+    .AddJsonFile("training-settings.json",      optional: false, reloadOnChange: false)
+    .AddJsonFile("aggregation-settings.json",   optional: true,  reloadOnChange: false)
     .AddEnvironmentVariables()
     .AddCommandLine(args)
     .Build();
@@ -43,6 +46,10 @@ var configuration = new ConfigurationBuilder()
 StartupSettings startupSettings =
     configuration.GetSection("StartupSettings").Get<StartupSettings>()
     ?? new StartupSettings();
+
+AggregationSettings aggregationSettings =
+    configuration.GetSection(AggregationSettings.SectionName).Get<AggregationSettings>()
+    ?? new AggregationSettings();
 
 ModelType? selectedAlgorithm = null;
 
@@ -55,7 +62,11 @@ if (!startupSettings.IsPreconditionStart)
     TryClearConsole();
 }
 
-bool isTraining   = startupSettings.ExecutionMode == ExecutionMode.Training;
+bool aggIncludesTraining = startupSettings.ExecutionMode == ExecutionMode.AggregationRun
+    && aggregationSettings.Steps.Any(s =>
+        s.Mode.Equals("Training", StringComparison.OrdinalIgnoreCase));
+
+bool isTraining   = startupSettings.ExecutionMode == ExecutionMode.Training || aggIncludesTraining;
 bool isConsole    = startupSettings.PresentationMode == PresentationMode.Console;
 bool isWebEnabled = startupSettings.IsWebApiEnabled;
 
@@ -82,6 +93,7 @@ else
     host = Host.CreateDefaultBuilder(args)
         .ConfigureAppConfiguration((_, cfgBuilder) =>
         {
+            cfgBuilder.AddJsonFile("training-settings.json", optional: false, reloadOnChange: false);
             if (isConsole)
                 cfgBuilder.AddConsoleConfigurationFile();
         })
@@ -94,12 +106,26 @@ else
             if (startupSettings.ExecutionMode is ExecutionMode.SingleTrainedAISimulation
                                               or ExecutionMode.MassTrainedAISimulation)
             {
-                var modelPath = startupSettings.TrainedModelPath;
-                var modelType = Path.GetFileName(modelPath)
-                    .StartsWith("a2c", StringComparison.OrdinalIgnoreCase) ? ModelType.A2C
-                    : Path.GetFileName(modelPath)
-                    .StartsWith("dqn", StringComparison.OrdinalIgnoreCase) ? ModelType.DQN
-                    : ModelType.PPO;
+                // Resolve the model type: prefer the interactively selected algorithm,
+                // then fall back to what is configured in appsettings.json.
+                var modelType = selectedAlgorithm ?? startupSettings.Algorithm;
+
+                // Auto-discover the latest trained model for the chosen algorithm.
+                var fileSourceCfg = ctx.Configuration
+                    .GetSection(FileSourceConfiguration.SectionName)
+                    .Get<FileSourceConfiguration>() ?? new FileSourceConfiguration();
+
+                var algorithmFolder = Path.Combine(
+                    fileSourceCfg.FileStorage.BasePath,
+                    fileSourceCfg.FileStorage.TrainedAlgorithms,
+                    modelType.ToString());
+
+                var modelPath = Directory.Exists(algorithmFolder)
+                    ? Directory.GetFiles(algorithmFolder)
+                        .OrderByDescending(File.GetLastWriteTime)
+                        .FirstOrDefault() ?? string.Empty
+                    : string.Empty;
+
                 var aiConfig = new AiConfiguration
                 {
                     ModelType  = modelType,
@@ -136,6 +162,7 @@ if (isWebEnabled)
 try
 {
     var sandboxConfiguration = host.Services.GetRequiredService<IOptions<SandBoxConfiguration>>();
+    var fileSourceConfig     = host.Services.GetRequiredService<IOptions<FileSourceConfiguration>>();
 
     switch (startupSettings.ExecutionMode)
     {
@@ -171,10 +198,10 @@ try
             var executorFactory = scope.ServiceProvider.GetRequiredService<IExecutorFactory>();
             var batchFileManager = scope.ServiceProvider.GetRequiredService<IFileDataManager<GeneralBatchRunInformation>>();
 
-            // Build the CSV storage folder: FileSource.Path / MASS_RUN_STATISTICS
+            // Build the CSV storage folder: FileStorage.BasePath / FileStorage.SavedSimulations
             string massRunStatsFolder = System.IO.Path.Combine(
-                sandboxConfiguration.Value.MapSettings.FileSource.Path,
-                "MASS_RUN_STATISTICS");
+                fileSourceConfig.Value.FileStorage.BasePath,
+                fileSourceConfig.Value.FileStorage.SavedSimulations);
             var statisticFileManager = new StatisticFileDataManager(massRunStatsFolder);
 
             // Map startup settings (excluding IsPreconditionStart and PresentationMode)
@@ -225,8 +252,8 @@ try
             var batchFileManager = scope.ServiceProvider.GetRequiredService<IFileDataManager<GeneralBatchRunInformation>>();
 
             string massRunStatsFolder = System.IO.Path.Combine(
-                sandboxConfiguration.Value.MapSettings.FileSource.Path,
-                "MASS_RUN_STATISTICS");
+                fileSourceConfig.Value.FileStorage.BasePath,
+                fileSourceConfig.Value.FileStorage.SavedSimulations);
             var statisticFileManager = new StatisticFileDataManager(massRunStatsFolder);
 
             var simulationStartupSettings = new SimulationStartupSettings
@@ -252,6 +279,54 @@ try
         // ── Not yet implemented ────────────────────────────────────────────────────
         case ExecutionMode.LoadSimulation:
             throw new NotImplementedException("LoadSimulation is not yet implemented.");
+
+        // ── Aggregation run ────────────────────────────────────────────────────────
+        case ExecutionMode.AggregationRun:
+        {
+            string aggStatsFolder = System.IO.Path.Combine(
+                fileSourceConfig.Value.FileStorage.BasePath,
+                fileSourceConfig.Value.FileStorage.SavedSimulations);
+            var aggStatisticFileManager = new StatisticFileDataManager(aggStatsFolder);
+
+            string algorithmsFolderPath = System.IO.Path.Combine(
+                fileSourceConfig.Value.FileStorage.BasePath,
+                fileSourceConfig.Value.FileStorage.TrainedAlgorithms);
+
+            var aggRunner = new AggregationRunner(
+                host.Services,
+                host.Services.GetRequiredService<TrainingSettings>(),
+                host.Services.GetRequiredService<Sb3AlgorithmTypeProvider>(),
+                host.Services.GetRequiredService<IPolicyTrainerClient>(),
+                host.Services.GetRequiredService<GymBrokerRegistry>(),
+                aggStatisticFileManager,
+                sandboxConfiguration,
+                algorithmsFolderPath);
+
+            // Map aggregation steps from settings.
+            var aggStepConfigs = aggregationSettings.Steps
+                .Select(s => new AggregationStepConfiguration(
+                    s.Name,
+                    Enum.TryParse<ExecutionMode>(s.Mode, ignoreCase: true, out var parsedMode)
+                        ? parsedMode
+                        : throw new InvalidOperationException(
+                            $"Unknown ExecutionMode '{s.Mode}' in aggregation-settings.json.")))
+                .ToList();
+
+            var aggIncrementalProperties = new SimulationIncrementalPropertiesSettings
+            {
+                SimulationCount = startupSettings.IncrementalProperties.SimulationCount,
+                Properties      = startupSettings.IncrementalProperties.Properties,
+            };
+
+            await aggRunner.RunAggregationAsync(
+                aggStepConfigs,
+                startupSettings.StandardSimulationCount,
+                aggIncrementalProperties,
+                selectedAlgorithm ?? startupSettings.Algorithm,
+                startupSettings.PolicyType,
+                host.Services.GetRequiredService<IHostApplicationLifetime>().ApplicationStopping);
+            break;
+        }
     }
 }
 finally
@@ -274,6 +349,7 @@ static void RegisterCoreServices(
 {
     services.AddEventAggregator();
     services.AddInfrastructureServices(configuration);
+    services.AddPolicyTrainerClient(configuration);
     services.AddDomainServices();
     services.AddApplicationServices();
     services.AddAiSandboxServices(executionMode);

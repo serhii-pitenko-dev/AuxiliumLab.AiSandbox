@@ -15,11 +15,12 @@ public class StartupSettings
     public ExecutionMode ExecutionMode { get; set; }
 
     /// <summary>
-    /// Absolute path to the pre-trained model .zip file used by
-    /// SingleTrainedAISimulation and MassTrainedAISimulation modes.
-    /// Example: E:\\FILE_STORAGE\\TRAINED_ALGORITHMS\\PPO\\ppo_100000_2048_64_0.0003_20260227.zip
+    /// The RL algorithm to use for training or for selecting the trained model at inference time.
+    /// When ExecutionMode is SingleTrainedAISimulation or MassTrainedAISimulation the latest model
+    /// file inside FileStorage.BasePath / FileStorage.TrainedAlgorithms / Algorithm is loaded
+    /// automatically.
     /// </summary>
-    public string TrainedModelPath { get; set; } = string.Empty;
+    public ModelType Algorithm { get; set; } = ModelType.PPO;
     public bool TestPreconditionsEnabled { get; set; }
     public bool IsWebApiEnabled { get; set; }
     public AiPolicy PolicyType { get; set; }

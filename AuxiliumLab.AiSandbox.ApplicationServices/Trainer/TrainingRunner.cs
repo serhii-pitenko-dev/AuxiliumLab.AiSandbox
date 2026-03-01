@@ -12,8 +12,10 @@ using AuxiliumLab.AiSandbox.ApplicationServices.Runner.TestPreconditionSet;
 using AuxiliumLab.AiSandbox.ApplicationServices.Saver.Persistence.Sandbox.Mappers;
 using AuxiliumLab.AiSandbox.ApplicationServices.Saver.Persistence.Sandbox.States;
 using AuxiliumLab.AiSandbox.Common.MessageBroker;
+using AuxiliumLab.AiSandbox.Common.MessageBroker.Contracts.Sb3Contract.Commands;
 using AuxiliumLab.AiSandbox.Domain.Playgrounds;
 using AuxiliumLab.AiSandbox.Infrastructure.Configuration.Preconditions;
+using AuxiliumLab.AiSandbox.Domain.Statistics.Result;
 using AuxiliumLab.AiSandbox.Infrastructure.FileManager;
 using AuxiliumLab.AiSandbox.Infrastructure.MemoryManager;
 using AuxiliumLab.AiSandbox.SharedBaseTypes.AiContract.Dto;
@@ -44,7 +46,7 @@ public class TrainingRunner
         _gymBrokerRegistry = gymBrokerRegistry;
     }
 
-    public async Task RunTrainingAsync(ModelType algorithmType, CancellationToken cancellationToken = default)
+    public async Task<TrainingRunInfo> RunTrainingAsync(ModelType algorithmType, CancellationToken cancellationToken = default)
     {
         // 1. Find the settings for the selected algorithm
         string algorithmName = algorithmType.ToString().ToUpper();
@@ -76,6 +78,8 @@ public class TrainingRunner
         int nEnvs = Math.Max(1, training.PhysicalCores);
         var executorTasks = new List<Task>();
         var gymIds = new List<Guid>();
+        var gymCtsList    = new List<CancellationTokenSource>();
+        var linkedCtsList = new List<CancellationTokenSource>();
 
         for (int i = 0; i < nEnvs; i++)
         {
@@ -126,14 +130,31 @@ public class TrainingRunner
             // Set the episode callback so Sb3Actions can restart episodes
             sb3.SetEpisodeCallback(() => CreateEpisodeExecutor().RunAsync());
 
-            // Keep looping episodes until cancellation
+            // Cancel when Python closes this gym's connection (signals training complete). 
+            var gymCloseCts = new CancellationTokenSource();
+            var linkedCts   = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, gymCloseCts.Token);
+            gymCtsList.Add(gymCloseCts);
+            linkedCtsList.Add(linkedCts);
+
+            var capturedGymId = sb3.GymId;
+            gymBroker.Subscribe<RequestSimulationCloseCommand>(cmd =>
+            {
+                if (cmd.GymId == capturedGymId)
+                    gymCloseCts.Cancel();
+            });
+
+            // Keep running until Python closes this gym (training complete) or app is stopped.
             var execTask = Task.Run(async () =>
             {
                 // The first episode is started by Python calling Reset(gymId).
                 // Subsequent episodes are also started via the episode callback.
-                // TrainingRunner waits until cancellation is requested.
-                await Task.Delay(Timeout.Infinite, cancellationToken).ConfigureAwait(false);
-            }, cancellationToken);
+                // TrainingRunner exits when Python closes all gyms after training finishes.
+                try
+                {
+                    await Task.Delay(Timeout.Infinite, linkedCts.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) { }
+            }, CancellationToken.None);
 
             executorTasks.Add(execTask);
         }
@@ -174,20 +195,30 @@ public class TrainingRunner
         Console.WriteLine($"[Training] Gym IDs: {string.Join(", ", gymIds.Select(g => g.ToString("N")[..8]))}");
         await training.Run(_policyTrainerClient, gymIds);
 
-        // 7. Wait until cancellation (training is driven by Python gym calls)
+        // 7. Wait until all gyms close (Python training complete) or app is stopped.
         try
         {
             await Task.WhenAll(executorTasks).ConfigureAwait(false);
+            Console.WriteLine("[Training] All gyms closed — training complete.");
         }
         catch (OperationCanceledException)
         {
-            Console.WriteLine("[Training] Training cancelled.");
+            Console.WriteLine("[Training] Training cancelled by application stop.");
         }
         finally
         {
             // Clean up broker registrations so stale gym IDs don't linger
             foreach (var id in gymIds)
                 _gymBrokerRegistry.Unregister(id);
+
+            // Dispose per-gym cancellation tokens
+            foreach (var cts in linkedCtsList) cts.Dispose();
+            foreach (var cts in gymCtsList)    cts.Dispose();
         }
+
+        // Return training metadata so callers (e.g. AggregationRunner) can include it in reports.
+        var parameterDict = algoSettings.Parameters
+            .ToDictionary(p => p.Name, p => p.Value);
+        return new TrainingRunInfo(algorithmName, experimentId, parameterDict);
     }
 }

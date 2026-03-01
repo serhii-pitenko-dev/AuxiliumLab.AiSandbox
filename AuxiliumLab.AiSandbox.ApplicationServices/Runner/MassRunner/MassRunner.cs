@@ -45,7 +45,7 @@ public class MassRunner
     ///   Property names from <see cref="IncrementalPropertyNames"/> whose ranges should be swept.
     ///   Pass <see langword="null"/> or an empty enumerable to skip incremental runs entirely.
     /// </param>
-    public async Task RunManyAsync(
+    public async Task<MassRunCapturedResult> RunManyAsync(
         IExecutorFactory executorFactory,
         int count,
         SandBoxConfiguration? configuration = null,
@@ -101,6 +101,8 @@ public class MassRunner
         await AppendMassRunSummaryCsvAsync(csvFileName, massRunSummary);
 
         LogBatchFooter(startTime, totalCompleted, totalWins, totalTurns);
+
+        return new MassRunCapturedResult(standardBatch, sweepSummaries, areaSweepSummary);
     }
 
     // ── Step 1: console header ─────────────────────────────────────────────────

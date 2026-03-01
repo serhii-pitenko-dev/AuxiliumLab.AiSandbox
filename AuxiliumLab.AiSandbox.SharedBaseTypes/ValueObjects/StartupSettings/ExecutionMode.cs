@@ -35,5 +35,11 @@ public enum ExecutionMode
     /// <summary>
     /// Generate playground with preconditions and test them. This mode is used for testing specific scenarios and does not require a connection to the training service.
     /// </summary>
-    TestPreconditions
+    TestPreconditions,
+    /// <summary>
+    /// Runs a configurable sequence of jobs (Training, MassRandomAISimulation, MassTrainedAISimulation) one after another
+    /// and produces a combined aggregation report CSV that compares results across run types.
+    /// The sequence is defined in aggregation-settings.json.
+    /// </summary>
+    AggregationRun
 }

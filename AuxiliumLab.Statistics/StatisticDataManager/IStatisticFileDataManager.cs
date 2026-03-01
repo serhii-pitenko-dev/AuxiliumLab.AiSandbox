@@ -1,8 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using AuxiliumLab.AiSandbox.Domain.Statistics.Result;
 
 namespace AuxiliumLab.AiSandbox.Statistics.StatisticDataManager;
 
@@ -16,5 +12,15 @@ public interface IStatisticFileDataManager
     /// Creates the file (and any parent directories) if it does not yet exist.
     /// </summary>
     public Task ConvertToCsvAndAppendAsync(string fileName, string csvContent);
+
+    /// <summary>
+    /// Saves a full aggregation run report to a new CSV file named
+    /// <c>aggregation_{timestamp}.csv</c> inside the statistics folder.
+    /// The report compares results from multiple run types side-by-side.
+    /// </summary>
+    /// <param name="steps">Ordered list of completed aggregation step results.</param>
+    /// <param name="runDate">The date/time the aggregation run started.</param>
+    /// <returns>The absolute path to the saved CSV file.</returns>
+    Task<string> SaveAggregationReportAsync(IReadOnlyList<AggregationStepResult> steps, DateTime runDate);
 }
 

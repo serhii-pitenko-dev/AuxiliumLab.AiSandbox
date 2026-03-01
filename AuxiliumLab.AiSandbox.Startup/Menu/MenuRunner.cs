@@ -41,10 +41,11 @@ internal class MenuRunner : IMenuRunner
             Console.WriteLine("3. Single Trained Ai Simulation");
             Console.WriteLine("4. Mass Random AI Simulation");
             Console.WriteLine("5. Mass Trained AI Simulation");
-            Console.WriteLine("6. Load Simulation");
-            Console.WriteLine("7. Test Preconditions");
+            Console.WriteLine("6. Aggregation Run");
+            Console.WriteLine("7. Load Simulation");
+            Console.WriteLine("8. Test Preconditions");
             Console.Write("> ");
-            executionChoice = ReadChoice(7);
+            executionChoice = ReadChoice(8);
 
             settings.ExecutionMode = executionChoice switch
             {
@@ -53,7 +54,8 @@ internal class MenuRunner : IMenuRunner
                 3 => ExecutionMode.SingleTrainedAISimulation,
                 4 => ExecutionMode.MassRandomAISimulation,
                 5 => ExecutionMode.MassTrainedAISimulation,
-                6 => ExecutionMode.LoadSimulation,
+                6 => ExecutionMode.AggregationRun,
+                7 => ExecutionMode.LoadSimulation,
                 _ => ExecutionMode.TestPreconditions
             };
         }

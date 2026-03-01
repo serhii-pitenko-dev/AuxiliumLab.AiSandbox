@@ -15,7 +15,10 @@ Depends on: every other project in the solution.
 ```
 Program.cs
   │
-  ├─ 1. Read appsettings.json  →  StartupSettings
+  ├─ 1. Read configuration files
+  │       appsettings.json           →  StartupSettings
+  │       training-settings.json     →  TrainingSettings
+  │       aggregation-settings.json  →  AggregationSettings  (optional)
   │
   ├─ 2. Interactive menu (unless IsPreconditionStart = true)
   │       MenuRunner.ResolveSettings()
@@ -24,8 +27,9 @@ Program.cs
   │         └─ Choose Algorithm (Training mode only)
   │
   ├─ 3. Build host
-  │       Training  →  GrpcTrainingHost (Kestrel + HTTP/2 on :50062)
-  │       All else  →  Host.CreateDefaultBuilder (pure generic host)
+  │       Training, or AggregationRun containing a Training step
+  │                     →  GrpcTrainingHost (Kestrel + HTTP/2 on :50062)
+  │       All else      →  Host.CreateDefaultBuilder (pure generic host)
   │
   ├─ 4. Start ConsoleRunner (if Console mode)
   │
@@ -34,11 +38,13 @@ Program.cs
   ├─ 6. Optionally launch WebApiHost in background (if IsWebApiEnabled)
   │
   └─ 7. Dispatch on ExecutionMode:
-          Training                 → TrainingRunner.RunTrainingAsync()
-          SingleRandomAISimulation → SingleRunner.RunSingleAsync()
-          MassRandomAISimulation   → MassRunner.RunManyAsync()
-          TestPreconditions        → SingleRunner.RunTestPreconditionsAsync()
-          (others not yet implemented)
+          Training                   → TrainingRunner.RunTrainingAsync()
+          SingleRandomAISimulation   → SingleRunner.RunSingleAsync()
+          MassRandomAISimulation     → MassRunner.RunManyAsync()
+          SingleTrainedAISimulation  → SingleRunner.RunSingleTrainedAsync()
+          MassTrainedAISimulation    → MassRunner.RunManyAsync()
+          TestPreconditions          → SingleRunner.RunTestPreconditionsAsync()
+          AggregationRun             → AggregationRunner.RunAggregationAsync()
 ```
 
 ## Execution Modes
@@ -52,6 +58,69 @@ Program.cs
 | `SingleTrainedAISimulation` | Generic | Single run using a trained model | ⏭️ |
 | `MassTrainedAISimulation` | Generic | Batch runs using trained models | ⏭️ |
 | `LoadSimulation` | Generic | Load and continue a saved simulation state | ⏭️ |
+| `AggregationRun` | Generic | Runs a configurable sequence of jobs and produces a combined CSV report | ✅ |
+
+## AggregationRun
+
+`AggregationRun` lets you define an ordered sequence of jobs to be executed one after another in a single launch. When all steps finish, a combined comparison report is written to disk.
+
+### How it works
+
+1. On startup, `Program.cs` loads `aggregation-settings.json` (located next to the executable).
+2. `AggregationRunner.RunAggregationAsync` iterates the step list in order:
+   - **`Training`** — delegates to `TrainingRunner.RunTrainingAsync` and captures the algorithm name, experiment ID and hyperparameters as `TrainingRunInfo`.
+   - **`MassRandomAISimulation`** — delegates to `MassRunner.RunManyAsync` (random AI) and captures the full `MassRunCapturedResult`.
+   - **`MassTrainedAISimulation`** — delegates to `MassRunner.RunManyAsync` via `InferenceExecutorFactory`, which wires `InferenceActions` (uses the last trained model). Captures `MassRunCapturedResult`.
+3. After all steps, `IStatisticFileDataManager.SaveAggregationReportAsync` is called to write the report.
+
+### Configuration — `aggregation-settings.json`
+
+The file lives in the `AuxiliumLab.AiSandbox.Startup` project and is copied to the output directory automatically.
+
+```json
+{
+  "AggregationSettings": {
+    "Steps": [
+      { "Name": "Training",  "Mode": "Training" },
+      { "Name": "Random AI", "Mode": "MassRandomAISimulation" },
+      { "Name": "PPO - AI",  "Mode": "MassTrainedAISimulation" }
+    ]
+  }
+}
+```
+
+Each step has two fields:
+
+| Field | Description |
+|---|---|
+| `Name` | Human-readable label used as a column header in the CSV report |
+| `Mode` | One of the `ExecutionMode` enum values (`Training`, `MassRandomAISimulation`, `MassTrainedAISimulation`) |
+
+Steps are executed in the order they appear in the array. The `Training` step, if present, must appear before any `MassTrainedAISimulation` step so the model is ready.
+
+### Output — report location and file name
+
+The report is saved by `StatisticFileDataManager` into the **`STATISTICS`** sub-folder relative to the application's configured file-storage base path:
+
+```
+<FileStorage.BasePath>/STATISTICS/aggregation_<yyyy-MM-dd_HH-mm-ss>.csv
+```
+
+Example: `STATISTICS/aggregation_2026-03-01_14-30-00.csv`
+
+### Report format (CSV)
+
+The file is a **UTF-8 CSV** with commented section headers (`# …`). It is structured as follows:
+
+| Section | Content |
+|---|---|
+| **Header** | Report date; comma-separated list of all step names |
+| **Training Information** | Algorithm name, experiment ID and all hyperparameters (only present when a `Training` step ran) |
+| **Standard Runs Comparison** | One data row; columns are `MaxTurns \| AvgTurns \| Wins \| WinPct` repeated for every mass-run step |
+| **Incremental Sweep: \<property\>** | One section per swept property; rows = sweep-step values; same 4-column group per run type |
+| **Area Sweep** | Single-row summary of the area-parameter sweep (when available) |
+
+The `WinPct` column is `Wins / TotalRuns * 100` as a floating-point percentage (no `%` symbol).
 
 ## `RegisterCoreServices`
 ```csharp

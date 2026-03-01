@@ -1,8 +1,5 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using AuxiliumLab.AiSandbox.Domain.Statistics.Result;
+using AuxiliumLab.AiSandbox.Statistics.Converters;
 
 namespace AuxiliumLab.AiSandbox.Statistics.StatisticDataManager;
 
@@ -32,6 +29,18 @@ public class StatisticFileDataManager : IStatisticFileDataManager
     {
         string filePath = System.IO.Path.Combine(folder, fileName);
         return System.IO.File.AppendAllTextAsync(filePath, csvContent);
+    }
+
+    /// <inheritdoc/>
+    public async Task<string> SaveAggregationReportAsync(IReadOnlyList<AggregationStepResult> steps, DateTime runDate)
+    {
+        string fileName = $"aggregation_{runDate:yyyy-MM-dd_HH-mm-ss}.csv";
+        string filePath = System.IO.Path.Combine(folder, fileName);
+
+        string csvContent = AggregationReportConverter.ToCsv(steps, runDate);
+        await System.IO.File.WriteAllTextAsync(filePath, csvContent);
+
+        return filePath;
     }
 }
 

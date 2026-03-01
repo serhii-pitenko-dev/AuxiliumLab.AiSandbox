@@ -1,4 +1,7 @@
 using AuxiliumLab.AiSandbox.Ai;
+using AuxiliumLab.AiSandbox.Ai.Configuration;
+using AuxiliumLab.AiSandbox.AiTrainingOrchestrator;
+using AuxiliumLab.AiSandbox.AiTrainingOrchestrator.GrpcClients;
 using AuxiliumLab.AiSandbox.ApplicationServices.Commands.Playground;
 using AuxiliumLab.AiSandbox.ApplicationServices.Runner.LogsDto;
 using AuxiliumLab.AiSandbox.ApplicationServices.Runner.LogsDto.Performance;
@@ -105,6 +108,41 @@ public class ExecutorFactory : IExecutorFactory
             agentStore,         // per-sim: matches the broker/aiActions pair
             broker,             // per-sim: no shared publish lock
             rpcClient,          // per-sim: subscribes to its own broker
+            _standardPlaygroundMapper,
+            _rawDataLogFileRepository,
+            _turnExecutionPerformanceFileRepository,
+            _sandboxExecutionPerformanceFileRepository,
+            _testPreconditionData);
+    }
+
+    /// <inheritdoc/>
+    public IStandardExecutor CreateInferenceExecutor(
+        IPolicyTrainerClient policyTrainerClient,
+        string modelPath,
+        AiConfiguration aiConfig)
+    {
+        // Each parallel simulation gets its own isolated broker, agent-store, and
+        // InferenceActions instance (InferenceActions stores per-game _playgroundId).
+        // The policyTrainerClient and modelPath are shared and read-only after construction.
+        var broker     = new AuxiliumLab.AiSandbox.Common.MessageBroker.MessageBroker();
+        var rpcClient  = new BrokerRpcClient(broker);
+        var agentStore = new MemoryDataManager<AgentStateForAIDecision>();
+        var aiActions  = new InferenceActions(
+            broker,
+            agentStore,
+            policyTrainerClient,
+            modelPath,
+            aiConfig);
+
+        return new StandardExecutor(
+            _mapCommands,
+            _sandboxRepository,
+            aiActions,
+            _configuration,
+            _playgroundStateFileRepository,
+            agentStore,
+            broker,
+            rpcClient,
             _standardPlaygroundMapper,
             _rawDataLogFileRepository,
             _turnExecutionPerformanceFileRepository,
